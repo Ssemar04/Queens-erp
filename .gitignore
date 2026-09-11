@@ -7,6 +7,7 @@ __pycache__/
 *.log
 
 node_modules/
+.pnpm-store/
 dist/
 dist-ssr/
 .npm-cache/

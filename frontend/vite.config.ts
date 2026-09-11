@@ -1,8 +1,8 @@
 import path from "path";
 import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
-import { cloudflare } from "@cloudflare/vite-plugin";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { nitro } from "nitro/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -227,8 +227,7 @@ function devServerFnErrorLogger() {
 }
 
 export default defineConfig(({ command }) => {
-  const useCloudflare = command === "build";
-  const base = "/queens-erp/";
+  const base = "/";
 
   return {
     /**
@@ -271,17 +270,9 @@ export default defineConfig(({ command }) => {
 
       devServerFnErrorLogger(),
 
-      ...(useCloudflare
-        ? [
-            cloudflare({
-              viteEnvironment: {
-                name: "ssr",
-              },
-            }),
-          ]
-        : []),
-
       tanstackStart(),
+
+      nitro(),
 
       viteReact(),
     ],
