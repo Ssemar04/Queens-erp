@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+*.log
+
+venv/
+.venv/
+
+app.db
+app.db-*
+*.db
+*.db-*
+tmp-*.db

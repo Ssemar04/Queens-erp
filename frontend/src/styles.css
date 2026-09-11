@@ -1,0 +1,459 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Geist Sans — variable font */
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Geist Mono — variable font */
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * Stackwise Design System
+ *
+ * Teal/amber palette per design-guidelines.md.
+ * All colors use oklch format. Semantic tokens only.
+ */
+
+@theme inline {
+  --font-sans: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-stock-healthy: var(--stock-healthy);
+  --color-stock-low: var(--stock-low);
+  --color-stock-out: var(--stock-out);
+  --color-amber-accent: var(--amber-accent);
+
+  /* -----------------------------------------------------
+     Fluid tokens — scale smoothly from mobile → desktop
+     Use tailwind @theme so these are usable as arbitrary
+     values like `text-fluid-h1` or `gap-fluid-md`.
+     ----------------------------------------------------- */
+  /* Fluid typography: clamps use viewport widths of 360px → 1440px */
+  --fs-fluid-xs:    clamp(0.66rem, 0.60rem + 0.25vw, 0.75rem);
+  --fs-fluid-sm:    clamp(0.75rem, 0.68rem + 0.33vw, 0.875rem);
+  --fs-fluid-base:  clamp(0.85rem, 0.74rem + 0.49vw, 1rem);
+  --fs-fluid-lg:    clamp(0.98rem, 0.84rem + 0.63vw, 1.15rem);
+  --fs-fluid-xl:    clamp(1.12rem, 0.94rem + 0.83vw, 1.38rem);
+  --fs-fluid-h3:    clamp(1.25rem, 1.02rem + 1.02vw, 1.65rem);
+  --fs-fluid-h2:    clamp(1.45rem, 1.15rem + 1.34vw, 2.05rem);
+  --fs-fluid-h1:    clamp(1.75rem, 1.35rem + 1.78vw, 2.55rem);
+  --fs-fluid-display: clamp(2.2rem, 1.6rem + 2.7vw, 3.5rem);
+
+  /* Fluid spacing */
+  --sp-fluid-1:  clamp(0.25rem,  0.18rem + 0.31vw, 0.375rem);
+  --sp-fluid-2:  clamp(0.375rem, 0.28rem + 0.44vw, 0.5rem);
+  --sp-fluid-3:  clamp(0.5rem,   0.35rem + 0.67vw, 0.75rem);
+  --sp-fluid-4:  clamp(0.75rem,  0.55rem + 0.89vw, 1rem);
+  --sp-fluid-5:  clamp(1rem,     0.72rem + 1.27vw, 1.5rem);
+  --sp-fluid-6:  clamp(1.25rem,  0.92rem + 1.52vw, 2rem);
+  --sp-fluid-8:  clamp(1.5rem,   1.05rem + 2.04vw, 2.5rem);
+  --sp-fluid-10: clamp(1.75rem,  1.18rem + 2.54vw, 3rem);
+  --sp-fluid-12: clamp(2rem,     1.35rem + 2.93vw, 3.5rem);
+
+  /* Fluid sidebar widths — respond to viewport gracefully */
+  --sidebar-width-fluid: clamp(15rem, 13.2rem + 7.1vw, 18.5rem);
+  --sidebar-width-icon-fluid: clamp(3rem, 2.6rem + 1.8vw, 3.75rem);
+  --sidebar-width-mobile-fluid: clamp(16rem, 12rem + 20vw, 20rem);
+
+  /* Fluid radius for large containers */
+  --radius-fluid-card: clamp(0.5rem, 0.42rem + 0.36vw, 0.75rem);
+  --radius-fluid-hero: clamp(0.75rem, 0.56rem + 0.89vw, 1.25rem);
+
+  /* Container max-width tiers (occupies 100% of available width next to sidebar) */
+  --container-narrow:  100%;
+  --container-standard: 100%;
+  --container-wide:   100%;
+  --container-fluid:  100%;
+
+  /* Viewport height fallback for mobile browsers (100svh → safe-area aware) */
+  --svh-fallback: 100vh;
+  --svh-safe: 100svh;
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* Core palette — dark navy blue + red */
+  --background: oklch(0.985 0.005 250);
+  --foreground: oklch(0.18 0.04 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.04 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.04 260);
+  --primary: var(--custom-primary, #003399);
+  --primary-foreground: oklch(0.985 0.005 250);
+  --secondary: oklch(0.58 0.22 25);
+  --secondary-foreground: oklch(0.985 0.005 250);
+  --muted: oklch(0.95 0.01 250);
+  --muted-foreground: oklch(0.50 0.03 260);
+  --accent: oklch(0.95 0.02 25);
+  --accent-foreground: oklch(0.25 0.08 260);
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.985 0.005 250);
+  --border: oklch(0.92 0.01 250);
+  --input: oklch(0.92 0.01 250);
+  --ring: var(--custom-primary, #0D1427);
+
+  /* Charts — navy + red spectrum */
+  --chart-1: oklch(0.25 0.08 260);
+  --chart-2: oklch(0.58 0.22 25);
+  --chart-3: oklch(0.45 0.12 260);
+  --chart-4: oklch(0.70 0.18 25);
+  --chart-5: oklch(0.55 0.06 260);
+
+  /* Sidebar — deep navy */
+  --sidebar: oklch(0.18 0.05 260);
+  --sidebar-foreground: oklch(0.92 0.01 250);
+  --sidebar-primary: var(--custom-primary, #0D1427);
+  --sidebar-primary-foreground: oklch(0.985 0.005 250);
+  --sidebar-accent: oklch(0.24 0.06 260);
+  --sidebar-accent-foreground: oklch(0.95 0.01 250);
+  --sidebar-border: oklch(0.26 0.05 260);
+  --sidebar-ring: oklch(0.58 0.22 25);
+
+  /* Metric tints */
+  --metric-healthy-bg: oklch(0.96 0.03 250);
+  --metric-warning-bg: oklch(0.96 0.04 35);
+  --metric-danger-bg: oklch(0.96 0.05 25);
+  --metric-neutral-bg: oklch(0.96 0.02 260);
+
+  /* Stock status tokens — keep semantic green for healthy */
+  --stock-healthy: oklch(0.55 0.15 155);
+  --stock-low: oklch(0.72 0.16 60);
+  --stock-out: oklch(0.58 0.22 25);
+  --amber-accent: oklch(0.58 0.22 25);
+}
+
+.dark {
+  --background: oklch(0.16 0.04 260);
+  --foreground: oklch(0.93 0.01 250);
+  --card: oklch(0.20 0.05 260);
+  --card-foreground: oklch(0.93 0.01 250);
+  --popover: oklch(0.20 0.05 260);
+  --popover-foreground: oklch(0.93 0.01 250);
+  --primary: var(--custom-primary, #0D1427);
+  --primary-foreground: oklch(0.985 0.005 250);
+  --secondary: oklch(0.30 0.07 260);
+  --secondary-foreground: oklch(0.93 0.01 250);
+  --muted: oklch(0.25 0.05 260);
+  --muted-foreground: oklch(0.68 0.02 250);
+  --accent: oklch(0.28 0.08 25);
+  --accent-foreground: oklch(0.93 0.01 250);
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.93 0.01 250);
+  --border: oklch(0.30 0.05 260);
+  --input: oklch(0.30 0.05 260);
+  --ring: var(--custom-primary, #0D1427);
+
+  /* Charts */
+  --chart-1: oklch(0.55 0.18 260);
+  --chart-2: oklch(0.65 0.22 25);
+  --chart-3: oklch(0.45 0.12 260);
+  --chart-4: oklch(0.75 0.18 25);
+  --chart-5: oklch(0.65 0.04 250);
+
+  /* Sidebar */
+  --sidebar: oklch(0.14 0.05 260);
+  --sidebar-foreground: oklch(0.93 0.01 250);
+  --sidebar-primary: var(--custom-primary, #0D1427);
+  --sidebar-primary-foreground: oklch(0.985 0.005 250);
+  --sidebar-accent: oklch(0.22 0.06 260);
+  --sidebar-accent-foreground: oklch(0.93 0.01 250);
+  --sidebar-border: oklch(0.26 0.05 260);
+  --sidebar-ring: oklch(0.65 0.22 25);
+
+  /* Stock status tokens */
+  --stock-healthy: oklch(0.65 0.15 155);
+  --stock-low: oklch(0.72 0.16 60);
+  --stock-out: oklch(0.65 0.22 25);
+  --amber-accent: oklch(0.65 0.22 25);
+}
+
+@theme inline {
+  --color-metric-healthy-bg: var(--metric-healthy-bg);
+  --color-metric-warning-bg: var(--metric-warning-bg);
+  --color-metric-danger-bg: var(--metric-danger-bg);
+  --color-metric-neutral-bg: var(--metric-neutral-bg);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    width: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: var(--fs-fluid-base);
+    overflow-x: hidden;
+  }
+
+  #root {
+    min-height: 100svh;
+  }
+
+  @supports (padding: max(0px)) {
+    body {
+      padding-left: env(safe-area-inset-left, 0);
+      padding-right: env(safe-area-inset-right, 0);
+    }
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+  h1 { font-size: var(--fs-fluid-h1); line-height: 1.15; letter-spacing: -0.02em; }
+  h2 { font-size: var(--fs-fluid-h2); line-height: 1.2;  letter-spacing: -0.015em; }
+  h3 { font-size: var(--fs-fluid-h3); line-height: 1.25; letter-spacing: -0.01em; }
+}
+
+/* Print styles — hide app chrome, show print view */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide everything except print view */
+  nav, header, aside, [data-radix-dialog-overlay],
+  .po-print-view ~ *, [role="banner"], [role="complementary"],
+  button, [data-slot="sheet-close"] {
+    display: none !important;
+  }
+
+  .po-print-view {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: white;
+    padding: 2rem;
+    overflow: visible;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 1.5cm;
+  }
+}
+
+/* Subtle pulse animation for critical anomaly cards */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* =========================================================
+   Creative Collapsible Sidebar — Animations & Effects
+   ========================================================= */
+
+/* Icon breathing / soft pulse for active collapsed icons */
+@keyframes sidebar-icon-breathe {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); }
+  50% { transform: scale(1.12); filter: drop-shadow(0 0 6px oklch(0.58 0.22 25 / 0.6)); }
+}
+
+.animate-sidebar-icon-breathe {
+  animation: sidebar-icon-breathe 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Active indicator glow sweep */
+@keyframes sidebar-glow-sweep {
+  0% { opacity: 0.4; transform: translateX(-2px); }
+  50% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0.4; transform: translateX(-2px); }
+}
+
+.animate-sidebar-glow {
+  animation: sidebar-glow-sweep 2s ease-in-out infinite;
+}
+
+/* Staggered fade-in slide for nav item labels on expand */
+@keyframes sidebar-stagger-in {
+  0% { opacity: 0; transform: translateX(-8px); filter: blur(2px); }
+  100% { opacity: 1; transform: translateX(0); filter: blur(0); }
+}
+
+.animate-sidebar-stagger {
+  animation: sidebar-stagger-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Magnetic toggle icon rotation */
+@keyframes sidebar-toggle-flip {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-sidebar-toggle-flip {
+  animation: sidebar-toggle-flip 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Subtle radial gradient pulse for header logo */
+@keyframes sidebar-logo-glow {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.58 0.22 25 / 0.0), inset 0 0 12px oklch(0.58 0.22 25 / 0.1); }
+  50% { box-shadow: 0 0 16px 2px oklch(0.58 0.22 25 / 0.25), inset 0 0 16px oklch(0.58 0.22 25 / 0.2); }
+}
+
+.animate-sidebar-logo-glow {
+  animation: sidebar-logo-glow 4s ease-in-out infinite;
+}
+
+/* Rail hover intensity bar */
+@keyframes sidebar-rail-pulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.5; }
+}
+
+.animate-sidebar-rail-pulse {
+  animation: sidebar-rail-pulse 3s ease-in-out infinite;
+}
+
+/* Sparkle / ripple on toggle click */
+@keyframes sidebar-ripple {
+  0% { transform: scale(0); opacity: 0.8; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+.animate-sidebar-ripple {
+  animation: sidebar-ripple 0.6s ease-out forwards;
+}
+
+/* Ambient shimmer for sidebar header background */
+@keyframes sidebar-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.sidebar-header-shimmer {
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    oklch(0.58 0.22 25 / 0.06) 25%,
+    oklch(0.58 0.22 25 / 0.12) 50%,
+    oklch(0.58 0.22 25 / 0.06) 75%,
+    transparent 100%
+  );
+  background-size: 200% 200%;
+  animation: sidebar-shimmer 8s ease-in-out infinite;
+}
+
+/* Nav item hover lift */
+.sidebar-nav-item {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.2s ease,
+              background-color 0.2s ease;
+}
+.sidebar-nav-item:hover:not([data-active="true"]) {
+  transform: translateX(2px);
+}
+
+/* Active nav item glowing left border bar */
+.sidebar-active-bar {
+  background: linear-gradient(180deg, oklch(0.65 0.22 25), oklch(0.48 0.18 25));
+  box-shadow: 0 0 12px 1px oklch(0.58 0.22 25 / 0.5);
+}
+
+/* Width transition — organic easing instead of linear */
+.sidebar-width-transition {
+  transition-property: width, left, right, padding, margin, gap;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-duration: 320ms;
+}
+
+/* Tooltip style enhancement for collapsed sidebar */
+.sidebar-tooltip-enhanced {
+  backdrop-filter: blur(8px);
+  border: 1px solid oklch(0.58 0.22 25 / 0.2);
+}
+
+/* Scrollbar beautification for sidebar */
+nav[data-sidebar="sidebar"] ::-webkit-scrollbar {
+  width: 4px;
+}
+nav[data-sidebar="sidebar"] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+nav[data-sidebar="sidebar"] ::-webkit-scrollbar-thumb {
+  background: oklch(0.58 0.22 25 / 0.25);
+  border-radius: 2px;
+  transition: background 0.2s ease;
+}
+nav[data-sidebar="sidebar"] ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.58 0.22 25 / 0.5);
+}
