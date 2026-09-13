@@ -82,6 +82,11 @@ interface Ctx {
 
 const ChatCtx = createContext<Ctx | null>(null);
 
+function responseError(err: unknown) {
+  if (typeof err !== "object" || err === null) return {};
+  return err as { response?: { status?: number; data?: { message?: string } } };
+}
+
 export function ChatProvider({ children }: { children: ReactNode }) {
   const value = useChatStore();
   return createElement(ChatCtx.Provider, { value }, children);
@@ -118,10 +123,11 @@ function useChatStore(): Ctx {
           setAccessDenied(true);
           setAccessMessage("Chat access is restricted to company employees only.");
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (cancelled) return;
-        const status = e?.response?.status;
-        const msg = e?.response?.data?.message;
+        const { response } = responseError(e);
+        const status = response?.status;
+        const msg = response?.data?.message;
         if (status === 403) {
           setAccessDenied(true);
           setAccessMessage(msg || "Access restricted to active company employees only.");
@@ -146,7 +152,7 @@ function useChatStore(): Ctx {
       heartbeatPresence(meId).catch(() => {});
     }, 30000);
     const onUnload = () => {
-      try { setPresenceOffline(meId); } catch {}
+      void setPresenceOffline(meId).catch(() => {});
     };
     window.addEventListener("beforeunload", onUnload);
     return () => {

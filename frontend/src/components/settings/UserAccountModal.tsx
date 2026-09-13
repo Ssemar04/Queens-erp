@@ -51,6 +51,14 @@ const PRESET_AVATARS = [
   { id: "gradient-4", class: "bg-gradient-to-tr from-amber-400 via-orange-500 to-rose-500 text-white" },
 ];
 
+function errorMessage(err: unknown, fallback: string) {
+  if (typeof err === "object" && err !== null) {
+    const maybe = err as { message?: string; response?: { data?: { message?: string } } };
+    return maybe.response?.data?.message || maybe.message || fallback;
+  }
+  return fallback;
+}
+
 export function UserAccountModal({ open, onOpenChange }: UserAccountModalProps) {
   const { user, updateUserProfile } = useAuth();
   const { role } = useRole();
@@ -174,9 +182,8 @@ export function UserAccountModal({ open, onOpenChange }: UserAccountModalProps) 
       } else {
         toast.error(res.message || "Failed to update password");
       }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "Failed to update password";
-      toast.error(msg);
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, "Failed to update password"));
     } finally {
       setSavingPassword(false);
     }

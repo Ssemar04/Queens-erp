@@ -1,4 +1,4 @@
-import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DemoProvider } from "@/contexts/DemoContext";
@@ -7,6 +7,7 @@ import { SettingsProvider } from "@/contexts/ThemeContext";
 import { Toaster } from "@/components/ui/sonner";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/query-client";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
@@ -37,23 +38,9 @@ export const Route = createRootRoute({
       },
     ],
   }),
-  shellComponent: RootShell,
   component: RootComponent,
+  notFoundComponent: NotFoundPage,
 });
-
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
 
 function RootComponent() {
   return (
@@ -80,4 +67,21 @@ function RootComponent() {
 function RealtimeBridge() {
   useRealtimeInvalidation();
   return null;
+}
+
+function NotFoundPage() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-background px-6 text-center text-foreground">
+      <div className="max-w-md">
+        <p className="text-sm font-medium text-muted-foreground">404</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Page not found</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The page you opened does not exist or has moved.
+        </p>
+        <Button asChild className="mt-6">
+          <Link to="/">Back to sign in</Link>
+        </Button>
+      </div>
+    </main>
+  );
 }

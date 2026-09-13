@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { useChat, formatTime, type Channel, type Message } from "@/components/chat/chat-store";
+import { useChat, formatTime, type Attachment, type Channel, type ChatUser, type Message } from "@/components/chat/chat-store";
 import { MessageList } from "@/components/chat/MessageList";
 import { MessageComposer } from "@/components/chat/MessageComposer";
 import { NewChannelDialog } from "@/components/chat/NewChannelDialog";
@@ -17,12 +17,31 @@ import { EditChannelDialog } from "@/components/chat/EditChannelDialog";
 import { NewDMDialog } from "@/components/chat/NewDMDialog";
 import { AddChannelMemberDialog } from "@/components/chat/AddChannelMemberDialog";
 import { useRole } from "@/hooks/useRole";
-import { getChannelMembers, getChatEmployees, type EnrichedChatMember } from "@/services/api";
+import { getChannelMembers, getChatEmployees, type EnrichedChatMember, type TypingState } from "@/services/api";
 
 export const Route = createFileRoute("/app/chat")({
   component: ChatPage,
   head: () => ({ meta: [{ title: "Chatroom · Queenstech ERP" }] }),
 });
+
+type ChatTab = "all" | "groups" | "dms";
+
+type ResponseError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
+function errorMessage(error: unknown, fallback: string) {
+  if (typeof error !== "object" || error === null) return fallback;
+  return (error as ResponseError).response?.data?.message || fallback;
+}
+
+function shortCode(code: string | null | undefined, fallback = "ADM") {
+  return (code || fallback).slice(-3);
+}
 
 function ChatPage() {
   const store = useChat();
@@ -68,7 +87,9 @@ function ChatPage() {
         const map: Record<string, EnrichedChatMember> = {};
         for (const m of members) map[m.userId] = m;
         setEnrichedMembers(map);
-      } catch {}
+      } catch {
+        setEnrichedMembers({});
+      }
     })();
     return () => { cancelled = true; };
   }, [activeId, channels.length, accessDenied, accessCheckLoading, users.length]);
@@ -106,9 +127,9 @@ function ChatPage() {
 
   useEffect(() => {
     if (activeId) markChannelAsRead(activeId);
-  }, [activeId, activeMessages.length]);
+  }, [activeId, activeMessages.length, markChannelAsRead]);
 
-  function handleSend(body: string, attachments: any[], mentions: string[]) {
+  function handleSend(body: string, attachments: Attachment[], mentions: string[]) {
     if (!active) return;
     send(active.id, body, attachments, mentions, replyTo?.id);
     setReplyTo(null);
@@ -131,9 +152,8 @@ function ChatPage() {
     try {
       await addChannelMember(active.id, userId);
       pushToast("ok", `Added ${name} to ${active.name}`);
-    } catch (e: any) {
-      const msg = e?.response?.data?.message || "Could not add member";
-      pushToast("err", msg);
+    } catch (e: unknown) {
+      pushToast("err", errorMessage(e, "Could not add member"));
     } finally {
       setAddingIds(prev => { const n = new Set(prev); n.delete(userId); return n; });
     }
@@ -145,9 +165,8 @@ function ChatPage() {
     try {
       await removeChannelMember(active.id, userId);
       pushToast("ok", `Removed ${name} from ${active.name}`);
-    } catch (e: any) {
-      const msg = e?.response?.data?.message || "Could not remove member";
-      pushToast("err", msg);
+    } catch (e: unknown) {
+      pushToast("err", errorMessage(e, "Could not remove member"));
     } finally {
       setRemovingIds(prev => { const n = new Set(prev); n.delete(userId); return n; });
       setPendingRemove(null);
@@ -263,7 +282,7 @@ function ChatPage() {
             {employeeInfo && (
               <div className="mb-2.5 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 px-2.5 py-1.5 flex items-center gap-2">
                 <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-[10px] font-bold text-white shadow-sm">
-                  {employeeInfo.code.slice(-3)}
+                  {shortCode(employeeInfo.code)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-semibold text-emerald-900 truncate leading-tight">{employeeInfo.name}</p>
@@ -282,7 +301,7 @@ function ChatPage() {
             </div>
           </div>
         </div>
-        <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="px-2 pt-2">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as ChatTab)} className="px-2 pt-2">
           <TabsList className="grid w-full grid-cols-3 h-8">
             <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
             <TabsTrigger value="groups" className="text-xs">Groups</TabsTrigger>
@@ -426,15 +445,14 @@ function ChatPage() {
 
             <TypingFooter active={active} typingByChannel={typingByChannel} userMap={userMap} meId={meId} />
 
-            <div onChange={handleTyping as any}>
-              <MessageComposer
-                members={users.filter((u) => active.memberIds.includes(u.id))}
-                meId={meId}
-                onSend={handleSend}
-                replyTo={replyTo ? { author: userMap.get(replyTo.authorId)?.name ?? "?", body: replyTo.body } : null}
-                onClearReply={() => setReplyTo(null)}
-              />
-            </div>
+            <MessageComposer
+              members={users.filter((u) => active.memberIds.includes(u.id))}
+              meId={meId}
+              onSend={handleSend}
+              onTyping={handleTyping}
+              replyTo={replyTo ? { author: userMap.get(replyTo.authorId)?.name ?? "?", body: replyTo.body } : null}
+              onClearReply={() => setReplyTo(null)}
+            />
           </>
         )}
       </main>
@@ -472,7 +490,7 @@ function ChatPage() {
                     {employeeInfo && (
                       <div className="mt-2 pt-2 border-t border-emerald-100/80 flex items-center gap-2">
                         <div className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-emerald-600 text-[9px] font-bold text-white">
-                          {employeeInfo.code.slice(-2)}
+                          {shortCode(employeeInfo.code).slice(-2)}
                         </div>
                         <div className="text-left">
                           <p className="font-medium text-emerald-900 leading-tight">{employeeInfo.name}</p>
@@ -618,7 +636,19 @@ function ChatPage() {
   );
 }
 
-function MessageListWrapper(props: any) {
+type MessageListWrapperProps = {
+  messages: Message[];
+  users: ChatUser[];
+  meId: string;
+  onReact: (id: string, emoji: string) => Promise<void>;
+  onPin: (id: string) => Promise<void>;
+  onReply: (m: Message) => void;
+  onEdit: (m: Message) => void;
+  onDelete: (id: string) => Promise<void>;
+  loading: boolean;
+};
+
+function MessageListWrapper(props: MessageListWrapperProps) {
   const { messages, loading, ...rest } = props;
   if (loading && messages.length === 0) {
     return (
@@ -652,7 +682,7 @@ function MessageListWrapper(props: any) {
   return <MessageListWithAnimations messages={messages} {...rest} />;
 }
 
-function MessageListWithAnimations({ messages, ...rest }: any) {
+function MessageListWithAnimations({ messages, ...rest }: Omit<MessageListWrapperProps, "loading">) {
   return (
     <div className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.04),transparent_60%)] px-3 py-4 space-y-3">
       <MessageList messages={messages} {...rest} />
@@ -660,7 +690,7 @@ function MessageListWithAnimations({ messages, ...rest }: any) {
   );
 }
 
-function TypingFooter({ active, typingByChannel, userMap, meId }: { active: Channel; typingByChannel: Record<string, any[]>; userMap: Map<string, any>; meId: string }) {
+function TypingFooter({ active, typingByChannel, userMap, meId }: { active: Channel; typingByChannel: Record<string, TypingState[]>; userMap: Map<string, ChatUser>; meId: string }) {
   const typing = (typingByChannel[active.id] ?? []).filter((t) => t.userId !== meId);
   if (typing.length === 0) return null;
   const names = typing.map((t) => userMap.get(t.userId)?.name.split(" ")[0] ?? "Someone");
@@ -681,7 +711,7 @@ function TypingFooter({ active, typingByChannel, userMap, meId }: { active: Chan
   );
 }
 
-function ChannelAvatar({ channel, userMap, meId, size = "md" }: { channel: Channel; userMap: Map<string, any>; meId: string; size?: "md" | "lg" }) {
+function ChannelAvatar({ channel, userMap, meId, size = "md" }: { channel: Channel; userMap: Map<string, ChatUser>; meId: string; size?: "md" | "lg" }) {
   const dim = size === "lg" ? "h-14 w-14 text-xl" : "h-9 w-9 text-base";
   if (channel.type === "dm") {
     const other = channel.memberIds.find((id) => id !== meId);

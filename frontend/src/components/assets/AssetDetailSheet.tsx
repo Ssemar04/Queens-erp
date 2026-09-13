@@ -20,7 +20,7 @@ interface Props {
   asset: Asset | null;
   onAddReading: (id: string, r: { date: string; value: number; recordedBy: string; note?: string }) => void;
   onAddService: (id: string, s: { date: string; type: "preventive" | "corrective" | "inspection" | "upgrade"; performedBy: string; cost: number; notes: string; nextDueDate?: string; nextDueMeter?: number }) => void;
-  onAddIncome: (id: string, income: Omit<AssetIncome, "id" | "createdAt" | "updatedAt">) => Promise<any>;
+  onAddIncome: (id: string, income: Omit<AssetIncome, "id" | "createdAt" | "updatedAt">) => Promise<unknown>;
   onRemoveIncome: (assetId: string, incomeId: string) => Promise<void>;
 }
 

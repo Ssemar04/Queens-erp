@@ -120,6 +120,12 @@ def get_branch_db(branch_id=None):
 
 
 def get_db():
+    try:
+        from flask import current_app
+        if current_app.config.get("DATABASE") == ":memory:":
+            return get_central_db()
+    except RuntimeError:
+        pass
     return get_branch_db()
 
 
@@ -517,6 +523,7 @@ def init_central_db(db):
             role TEXT NOT NULL,
             color TEXT NOT NULL DEFAULT 'from-emerald-500 to-teal-600',
             online INTEGER NOT NULL DEFAULT 1,
+            last_seen TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -558,6 +565,7 @@ def init_central_db(db):
         );
         """
     )
+    add_missing_columns(db, "chat_users", [("last_seen", "TEXT")])
     ensure_default_admin_user(db)
     db.commit()
 

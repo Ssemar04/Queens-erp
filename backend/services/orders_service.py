@@ -6,6 +6,7 @@ from services.loyalty_tiers_service import get_tier_for_points
 
 
 VALID_STATUSES = {"draft", "confirmed", "in_progress", "delivered", "cancelled"}
+VALID_PURCHASE_ORDER_STATUSES = {"draft", "submitted", "partial", "received", "cancelled"}
 
 
 def current_timestamp():
@@ -171,5 +172,172 @@ def update_order(order_id, data):
 
 def delete_order(order_id):
     cursor = get_db().execute("DELETE FROM sales_orders WHERE id = ?", (order_id,))
+    get_db().commit()
+    return cursor.rowcount
+
+
+def _purchase_order_record(row):
+    if not row:
+        return None
+    items = get_db().execute(
+        """
+        SELECT *
+        FROM purchase_order_items
+        WHERE purchase_order_id = ?
+        ORDER BY id ASC
+        """,
+        (row["id"],),
+    ).fetchall()
+    return row, items
+
+
+def list_purchase_orders():
+    rows = get_db().execute(
+        """
+        SELECT *
+        FROM purchase_orders
+        ORDER BY created_at DESC
+        """
+    ).fetchall()
+    return [_purchase_order_record(row) for row in rows]
+
+
+def get_purchase_order(po_id):
+    row = get_db().execute(
+        """
+        SELECT *
+        FROM purchase_orders
+        WHERE id = ?
+        """,
+        (po_id,),
+    ).fetchone()
+    return _purchase_order_record(row)
+
+
+def _purchase_order_total(items):
+    return sum(
+        int(item.get("quantityOrdered") or 0) * float(item.get("unitCost") or 0)
+        for item in items
+    )
+
+
+def create_purchase_order(data, created_by=""):
+    created_at = data.get("createdAt") or current_timestamp()
+    updated_at = data.get("updatedAt") or created_at
+    items = data.get("items") or []
+    total_cost = float(data.get("totalCost") or _purchase_order_total(items))
+    db = get_db()
+
+    db.execute(
+        """
+        INSERT INTO purchase_orders (
+            id, order_number, supplier_id, status, total_cost,
+            expected_delivery, notes, created_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            data["id"],
+            data.get("orderNumber") or f"PO-{created_at[:4]}-{str(data['id'])[:8].upper()}",
+            data["supplierId"],
+            data.get("status") or "draft",
+            total_cost,
+            data.get("expectedDelivery"),
+            data.get("notes") or "",
+            data.get("createdBy") or created_by or "system",
+            created_at,
+            updated_at,
+        ),
+    )
+
+    for item in items:
+        db.execute(
+            """
+            INSERT INTO purchase_order_items (
+                id, purchase_order_id, item_id,
+                quantity_ordered, quantity_received, unit_cost
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item["id"],
+                data["id"],
+                item["itemId"],
+                int(item.get("quantityOrdered") or 0),
+                int(item.get("quantityReceived") or 0),
+                float(item.get("unitCost") or 0),
+            ),
+        )
+
+    db.commit()
+    return get_purchase_order(data["id"])
+
+
+def update_purchase_order(po_id, data):
+    column_map = {
+        "orderNumber": "order_number",
+        "supplierId": "supplier_id",
+        "status": "status",
+        "totalCost": "total_cost",
+        "expectedDelivery": "expected_delivery",
+        "notes": "notes",
+        "createdBy": "created_by",
+        "updatedAt": "updated_at",
+    }
+    db = get_db()
+    updates = []
+    params = []
+
+    for key, column in column_map.items():
+        if key not in data:
+            continue
+        value = data[key]
+        if key == "totalCost":
+            value = float(value or 0)
+        updates.append(f"{column} = ?")
+        params.append(value)
+
+    if "items" in data:
+        items = data.get("items") or []
+        db.execute("DELETE FROM purchase_order_items WHERE purchase_order_id = ?", (po_id,))
+        for item in items:
+            db.execute(
+                """
+                INSERT INTO purchase_order_items (
+                    id, purchase_order_id, item_id,
+                    quantity_ordered, quantity_received, unit_cost
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item["id"],
+                    po_id,
+                    item["itemId"],
+                    int(item.get("quantityOrdered") or 0),
+                    int(item.get("quantityReceived") or 0),
+                    float(item.get("unitCost") or 0),
+                ),
+            )
+        if "totalCost" not in data:
+            updates.append("total_cost = ?")
+            params.append(float(_purchase_order_total(items)))
+
+    if "updatedAt" not in data:
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+
+    if updates:
+        params.append(po_id)
+        db.execute(
+            f"""
+            UPDATE purchase_orders
+            SET {', '.join(updates)}
+            WHERE id = ?
+            """,
+            params,
+        )
+
+    db.commit()
+    return get_purchase_order(po_id)
+
+
+def delete_purchase_order(po_id):
+    cursor = get_db().execute("DELETE FROM purchase_orders WHERE id = ?", (po_id,))
     get_db().commit()
     return cursor.rowcount

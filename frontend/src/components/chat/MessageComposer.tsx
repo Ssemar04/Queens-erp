@@ -9,13 +9,14 @@ interface Props {
   members: ChatUser[];
   meId: string;
   onSend: (body: string, attachments: Attachment[], mentions: string[]) => void;
+  onTyping?: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   replyTo?: { author: string; body: string } | null;
   onClearReply?: () => void;
 }
 
 const EMOJIS = ["👍", "🎉", "❤️", "🔥", "🙏", "😂", "👀", "✅", "🚀", "💯"];
 
-export function MessageComposer({ members, meId, onSend, replyTo, onClearReply }: Props) {
+export function MessageComposer({ members, meId, onSend, onTyping, replyTo, onClearReply }: Props) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -128,7 +129,10 @@ export function MessageComposer({ members, meId, onSend, replyTo, onClearReply }
         <Textarea
           ref={taRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            onTyping?.(e);
+          }}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
           placeholder="Type a message · @ to mention · Shift+Enter for new line"
           rows={1}
