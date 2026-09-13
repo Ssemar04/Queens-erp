@@ -1,6 +1,10 @@
-from flask import Flask, make_response, request
+from flask import Flask, jsonify, make_response, request
 from flask_cors import CORS
+from dotenv import load_dotenv
+import os
 import sys
+
+load_dotenv()
 
 from routes.auth_routes import auth_bp
 from routes.bank_routes import bank_bp
@@ -36,6 +40,12 @@ def create_app():
         "http://127.0.0.1:5001",
         "http://0.0.0.0:3000",
     ]
+    DEPLOYED_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    ALLOWED_ORIGINS = DEV_ORIGINS + DEPLOYED_ORIGINS
 
     CORS_ALLOW_HEADERS = [
         "Content-Type",
@@ -52,7 +62,7 @@ def create_app():
 
     CORS(
         app,
-        resources={r"/api/*": {"origins": DEV_ORIGINS}},
+        resources={r"/api/*": {"origins": ALLOWED_ORIGINS}},
         allow_headers=CORS_ALLOW_HEADERS,
         methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         supports_credentials=True,
@@ -69,9 +79,7 @@ def create_app():
     def _apply_cors_headers(response):
         origin = getattr(request, "_qterp_request_origin", None) or request.headers.get("Origin")
         if origin and request.path.startswith("/api/"):
-            if origin in DEV_ORIGINS:
-                response.headers["Access-Control-Allow-Origin"] = origin
-            else:
+            if origin in ALLOWED_ORIGINS:
                 response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS"
@@ -89,16 +97,18 @@ def create_app():
         if request.method == "OPTIONS" and request.path.startswith("/api/"):
             resp = make_response("", 204)
             origin = request.headers.get("Origin", "")
-            if origin in DEV_ORIGINS:
+            if origin in ALLOWED_ORIGINS:
                 resp.headers["Access-Control-Allow-Origin"] = origin
-            else:
-                resp.headers["Access-Control-Allow-Origin"] = origin or "*"
             resp.headers["Access-Control-Allow-Credentials"] = "true"
             resp.headers["Access-Control-Allow-Methods"] = "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS"
             resp.headers["Access-Control-Allow-Headers"] = ", ".join(CORS_ALLOW_HEADERS)
             resp.headers["Access-Control-Max-Age"] = "3600"
             resp.headers["Vary"] = "Origin"
             return resp
+
+    @app.route("/api/health")
+    def health():
+        return jsonify({"status": "ok"})
 
     app.teardown_appcontext(close_db)
     print("Registering blueprints...", file=sys.stderr)

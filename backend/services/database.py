@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", BASE_DIR / "app.db"))
-DATABASES_DIR = BASE_DIR / "databases"
+DATABASES_DIR = Path(os.getenv("DATABASES_DIR", BASE_DIR / "databases"))
 DEFAULT_ADMIN_EMAIL = os.getenv("QTERP_ADMIN_EMAIL", "admin@queenstech.com")
 DEFAULT_ADMIN_PASSWORD = os.getenv("QTERP_ADMIN_PASSWORD", "admin123")
 DEFAULT_ADMIN_NAME = os.getenv("QTERP_ADMIN_NAME", "House")

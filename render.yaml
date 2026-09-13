@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: qterp-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: CORS_ORIGINS
+        value: https://frontend-lpmbtgalo-ssemar04s-projects.vercel.app,https://frontend-olive-three-mufgrntdp9.vercel.app
+      - key: QTERP_ADMIN_EMAIL
+        sync: false
+      - key: QTERP_ADMIN_PASSWORD
+        sync: false
+      - key: QTERP_ADMIN_NAME
+        sync: false

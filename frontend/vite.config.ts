@@ -1,8 +1,7 @@
 import path from "path";
 import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
-import { nitro } from "nitro/vite";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -270,9 +269,7 @@ export default defineConfig(({ command }) => {
 
       devServerFnErrorLogger(),
 
-      tanstackStart(),
-
-      nitro(),
+      tanstackRouter(),
 
       viteReact(),
     ],
