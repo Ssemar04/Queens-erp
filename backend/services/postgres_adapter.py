@@ -60,6 +60,7 @@ def translate_sql(sql: str) -> str:
         translated,
         flags=re.IGNORECASE,
     )
+    translated = _drop_table_foreign_keys(translated)
     translated = re.sub(
         r"expires_at\s*>\s*CURRENT_TIMESTAMP",
         "expires_at::timestamptz > CURRENT_TIMESTAMP",
@@ -105,6 +106,16 @@ def _add_do_nothing_for_insert_ignore(original_sql: str, translated_sql: str) ->
     if re.search(r"\bON\s+CONFLICT\b", translated_sql, flags=re.IGNORECASE):
         return translated_sql
     return translated_sql.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+
+
+def _drop_table_foreign_keys(sql: str) -> str:
+    lines = []
+    for line in sql.splitlines():
+        if line.strip().upper().startswith("FOREIGN KEY "):
+            continue
+        lines.append(line)
+    translated = "\n".join(lines)
+    return re.sub(r",\s*\)", "\n)", translated)
 
 
 def split_script(script: str):
