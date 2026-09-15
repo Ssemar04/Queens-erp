@@ -68,6 +68,7 @@ def translate_sql(sql: str) -> str:
         flags=re.IGNORECASE,
     )
     translated = _replace_qmark_placeholders(translated)
+    translated = _escape_percent_signs_in_literals(translated)
 
     if "ON CONFLICT DO NOTHING" not in translated.upper():
         translated = _add_do_nothing_for_insert_ignore(sql, translated)
@@ -94,6 +95,31 @@ def _replace_qmark_placeholders(sql: str) -> str:
             in_double = not in_double
         elif char == "?" and not in_single and not in_double:
             result.append("%s")
+        else:
+            result.append(char)
+        index += 1
+    return "".join(result)
+
+
+def _escape_percent_signs_in_literals(sql: str) -> str:
+    result = []
+    in_single = False
+    in_double = False
+    index = 0
+    while index < len(sql):
+        char = sql[index]
+        if char == "'" and not in_double:
+            result.append(char)
+            if index + 1 < len(sql) and sql[index + 1] == "'":
+                index += 1
+                result.append(sql[index])
+            else:
+                in_single = not in_single
+        elif char == '"' and not in_single:
+            result.append(char)
+            in_double = not in_double
+        elif char == "%" and in_single:
+            result.append("%%")
         else:
             result.append(char)
         index += 1
