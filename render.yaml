@@ -12,6 +12,8 @@ services:
         value: 3.12.7
       - key: CORS_ORIGINS
         value: https://frontend-lpmbtgalo-ssemar04s-projects.vercel.app,https://frontend-olive-three-mufgrntdp9.vercel.app
+      - key: DATABASE_URL
+        sync: false
       - key: QTERP_ADMIN_EMAIL
         sync: false
       - key: QTERP_ADMIN_PASSWORD

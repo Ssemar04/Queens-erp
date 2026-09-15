@@ -10,21 +10,35 @@ from werkzeug.security import generate_password_hash
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", BASE_DIR / "app.db"))
 DATABASES_DIR = Path(os.getenv("DATABASES_DIR", BASE_DIR / "databases"))
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 DEFAULT_ADMIN_EMAIL = os.getenv("QTERP_ADMIN_EMAIL", "admin@queenstech.com")
 DEFAULT_ADMIN_PASSWORD = os.getenv("QTERP_ADMIN_PASSWORD", "admin123")
 DEFAULT_ADMIN_NAME = os.getenv("QTERP_ADMIN_NAME", "House")
 
 
+def use_postgres() -> bool:
+    return DATABASE_URL.startswith(("postgres://", "postgresql://"))
+
+
+def get_postgres_schema_connection(schema: str):
+    from services.postgres_adapter import connect_schema
+
+    return connect_schema(DATABASE_URL, schema)
+
+
 def get_central_db():
     if "central_db" not in g:
-        DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        g.central_db = sqlite3.connect(DATABASE_PATH, timeout=30)
-        g.central_db.row_factory = sqlite3.Row
-        g.central_db.execute("PRAGMA busy_timeout = 30000")
-        g.central_db.execute("PRAGMA foreign_keys = ON")
-        g.central_db.execute("PRAGMA journal_mode = WAL")
-        g.central_db.execute("PRAGMA synchronous = NORMAL")
-        g.central_db.execute("PRAGMA temp_store = MEMORY")
+        if use_postgres():
+            g.central_db = get_postgres_schema_connection("central")
+        else:
+            DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            g.central_db = sqlite3.connect(DATABASE_PATH, timeout=30)
+            g.central_db.row_factory = sqlite3.Row
+            g.central_db.execute("PRAGMA busy_timeout = 30000")
+            g.central_db.execute("PRAGMA foreign_keys = ON")
+            g.central_db.execute("PRAGMA journal_mode = WAL")
+            g.central_db.execute("PRAGMA synchronous = NORMAL")
+            g.central_db.execute("PRAGMA temp_store = MEMORY")
     return g.central_db
 
 
@@ -90,6 +104,33 @@ def get_branch_db(branch_id=None):
             g.branch_dbs = {}
 
         if clean_id not in g.branch_dbs:
+            if use_postgres():
+                from services.postgres_adapter import schema_name_for_branch
+
+                conn = get_postgres_schema_connection(schema_name_for_branch(clean_id))
+                is_new = not table_exists(conn, "items")
+            else:
+                db_path = get_branch_db_path(clean_id)
+                is_new = not db_path.exists()
+                conn = sqlite3.connect(db_path, timeout=30)
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA busy_timeout = 30000")
+                conn.execute("PRAGMA foreign_keys = ON")
+                conn.execute("PRAGMA journal_mode = WAL")
+                conn.execute("PRAGMA synchronous = NORMAL")
+                conn.execute("PRAGMA temp_store = MEMORY")
+            g.branch_dbs[clean_id] = conn
+            if is_new:
+                init_branch_db_tables(conn)
+        return g.branch_dbs[clean_id]
+    except RuntimeError:
+        # Outside Flask app context
+        if use_postgres():
+            from services.postgres_adapter import schema_name_for_branch
+
+            conn = get_postgres_schema_connection(schema_name_for_branch(clean_id))
+            is_new = not table_exists(conn, "items")
+        else:
             db_path = get_branch_db_path(clean_id)
             is_new = not db_path.exists()
             conn = sqlite3.connect(db_path, timeout=30)
@@ -99,21 +140,6 @@ def get_branch_db(branch_id=None):
             conn.execute("PRAGMA journal_mode = WAL")
             conn.execute("PRAGMA synchronous = NORMAL")
             conn.execute("PRAGMA temp_store = MEMORY")
-            g.branch_dbs[clean_id] = conn
-            if is_new:
-                init_branch_db_tables(conn)
-        return g.branch_dbs[clean_id]
-    except RuntimeError:
-        # Outside Flask app context
-        db_path = get_branch_db_path(clean_id)
-        is_new = not db_path.exists()
-        conn = sqlite3.connect(db_path, timeout=30)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA busy_timeout = 30000")
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA journal_mode = WAL")
-        conn.execute("PRAGMA synchronous = NORMAL")
-        conn.execute("PRAGMA temp_store = MEMORY")
         if is_new:
             init_branch_db_tables(conn)
         return conn
