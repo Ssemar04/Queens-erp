@@ -5,6 +5,7 @@ import type { UserRoleType } from "@/lib/roles";
 type PermissionAction =
   | "create_item" | "edit_item" | "delete_item"
   | "log_movement"
+  | "create_po"
   | "manage_users" | "view_analytics" | "export_data"
   | "access_settings" | "manage_suppliers";
 
@@ -13,6 +14,7 @@ const ACTION_ROLES: Record<PermissionAction, UserRoleType[]> = {
   edit_item: ["admin", "manager"],
   delete_item: ["admin", "manager"],
   log_movement: ["admin", "manager", "staff"],
+  create_po: ["admin", "manager"],
   manage_users: ["admin"],
   view_analytics: ["admin", "manager"],
   export_data: ["admin", "manager"],

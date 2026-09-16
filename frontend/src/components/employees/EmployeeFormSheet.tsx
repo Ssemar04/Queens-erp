@@ -90,7 +90,7 @@ export function EmployeeFormSheet({ open, onOpenChange, initial, onSave }: Props
     });
   }
 
-  const currentRoleInfo = SYSTEM_ROLES[systemRole] ?? SYSTEM_ROLES.requestor;
+  const currentRoleInfo = SYSTEM_ROLES[systemRole] ?? SYSTEM_ROLES.staff;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

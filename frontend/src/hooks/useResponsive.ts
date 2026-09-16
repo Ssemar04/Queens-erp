@@ -40,6 +40,8 @@ export function useResponsive(): UseResponsiveReturn {
       ? { w: 1024, h: 768 }
       : { w: window.innerWidth, h: window.innerHeight },
   );
+  const width = sizes.w;
+  const height = sizes.h;
 
   const reducedMotion = React.useMemo(
     () =>
@@ -67,18 +69,17 @@ export function useResponsive(): UseResponsiveReturn {
   }, []);
 
   const breakpoint = React.useMemo<BreakpointKey>(() => {
-    const { w } = sizes;
-    if (w >= BREAKPOINTS["2xl"]) return "2xl";
-    if (w >= BREAKPOINTS.xl) return "xl";
-    if (w >= BREAKPOINTS.lg) return "lg";
-    if (w >= BREAKPOINTS.md) return "md";
-    if (w >= BREAKPOINTS.sm) return "sm";
+    if (width >= BREAKPOINTS["2xl"]) return "2xl";
+    if (width >= BREAKPOINTS.xl) return "xl";
+    if (width >= BREAKPOINTS.lg) return "lg";
+    if (width >= BREAKPOINTS.md) return "md";
+    if (width >= BREAKPOINTS.sm) return "sm";
     return "xs";
-  }, [sizes.w]);
+  }, [width]);
 
   return {
-    width: sizes.w,
-    height: sizes.h,
+    width,
+    height,
     breakpoint,
     isXs: matchWidth("xs"),
     isSm: matchWidth("sm"),
@@ -86,11 +87,11 @@ export function useResponsive(): UseResponsiveReturn {
     isLg: matchWidth("lg"),
     isXl: matchWidth("xl"),
     is2xl: matchWidth("2xl"),
-    isMobile: sizes.w < BREAKPOINTS.md,
-    isTablet: sizes.w >= BREAKPOINTS.md && sizes.w < BREAKPOINTS.lg,
-    isDesktop: sizes.w >= BREAKPOINTS.lg,
-    isLargeDesktop: sizes.w >= BREAKPOINTS.xl,
-    orientation: sizes.h >= sizes.w ? "portrait" : "landscape",
+    isMobile: width < BREAKPOINTS.md,
+    isTablet: width >= BREAKPOINTS.md && width < BREAKPOINTS.lg,
+    isDesktop: width >= BREAKPOINTS.lg,
+    isLargeDesktop: width >= BREAKPOINTS.xl,
+    orientation: height >= width ? "portrait" : "landscape",
     reducedMotion,
   };
 }
