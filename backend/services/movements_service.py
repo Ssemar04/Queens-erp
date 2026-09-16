@@ -12,6 +12,31 @@ def current_timestamp():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _money(value):
+    try:
+        return max(0.0, float(value or 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def normalize_sale_payment(sale):
+    normalized = dict(sale)
+    total_amount = _money(normalized.get("totalAmount"))
+    deposit = _money(normalized.get("deposit"))
+    amount_tendered = _money(normalized.get("amountTendered"))
+
+    balance = max(0.0, total_amount - deposit)
+    change_due = max(0.0, amount_tendered - total_amount)
+
+    normalized["totalAmount"] = total_amount
+    normalized["deposit"] = deposit
+    normalized["amountTendered"] = amount_tendered
+    normalized["balance"] = balance
+    normalized["changeDue"] = change_due
+    normalized["status"] = "paid" if balance == 0 else ("partial" if deposit > 0 else "pending")
+    return normalized
+
+
 def list_movements(limit=None):
     sql = """
         SELECT
@@ -125,6 +150,8 @@ def create_movement(data, commit=True):
     sale = data.get("sale")
     if sale is not None and not isinstance(sale, dict):
         raise ValueError("sale must be an object when provided")
+    if sale:
+        sale = normalize_sale_payment(sale)
 
     sale_json = json.dumps(sale) if sale else None
     item_id = data.get("itemId") or None
@@ -170,6 +197,14 @@ def create_movement(data, commit=True):
 
     if sale:
         receipt_number = sale.get("receiptNumber") or data.get("reference") or f"TXN-{data['id']}"
+        balance_val = float(sale.get("balance") or 0)
+        deposit_val = float(sale.get("deposit") or 0)
+        raw_status = sale.get("status") or "paid"
+        auto_status = "void" if raw_status == "void" else ("paid" if balance_val <= 0 else ("partial" if deposit_val > 0 else "pending"))
+
+        synced_cust_id = sync_customer_from_sale(sale, created_at)
+        cust_id_to_save = sale.get("customerId") or synced_cust_id
+
         db.execute(
             """
             INSERT INTO transactions (
@@ -190,7 +225,7 @@ def create_movement(data, commit=True):
                 created_at,
                 item_id,
                 sale.get("itemName") or (item["name"] if item else ""),
-                sale.get("customerId"),
+                cust_id_to_save,
                 sale.get("customer") or "",
                 sale.get("telephone") or "",
                 sale.get("email") or "",
@@ -200,13 +235,13 @@ def create_movement(data, commit=True):
                 float(sale.get("vat") or 0),
                 float(sale.get("vatRate") or 0),
                 float(sale.get("totalAmount") or 0),
-                float(sale.get("deposit") or 0),
-                float(sale.get("balance") or 0),
+                deposit_val,
+                balance_val,
                 float(sale.get("amountTendered") or 0),
                 float(sale.get("changeDue") or 0),
                 float(sale.get("cumulativeAmount") or 0),
                 sale.get("paymentMethod") or "cash",
-                sale.get("status") or "paid",
+                auto_status,
                 receipt_number,
                 data.get("notes") or "",
                 sale.get("staff") or data.get("performedBy") or "system",
@@ -218,6 +253,8 @@ def create_movement(data, commit=True):
                 created_at,
             ),
         )
+
+        sync_debtor_from_sale(sale, receipt_number, created_at, cust_id_to_save)
 
     if item:
         item_updates = {
@@ -324,3 +361,155 @@ def update_transaction_status_by_receipt(receipt_number, new_status):
 
     # Return the updated movements list
     return list_movements()
+
+
+def sync_customer_from_sale(sale, created_at):
+    customer_name = (sale.get("customer") or "").strip()
+    if not customer_name or customer_name.lower() == "walk-in":
+        return None
+
+    customer_id = sale.get("customerId")
+    telephone = (sale.get("telephone") or "").strip()
+    email = (sale.get("email") or "").strip()
+    total_amount = float(sale.get("totalAmount") or 0)
+    balance = float(sale.get("balance") or 0)
+
+    db = get_db()
+    existing = None
+
+    if customer_id:
+        existing = db.execute("SELECT * FROM customers WHERE id = ?", (customer_id,)).fetchone()
+    
+    if not existing and telephone:
+        existing = db.execute("SELECT * FROM customers WHERE phone = ? AND phone != ''", (telephone,)).fetchone()
+        
+    if not existing and email:
+        existing = db.execute("SELECT * FROM customers WHERE email = ? AND email != ''", (email,)).fetchone()
+
+    if not existing and customer_name:
+        existing = db.execute("SELECT * FROM customers WHERE LOWER(name) = LOWER(?)", (customer_name,)).fetchone()
+
+    if existing:
+        cust_id = existing["id"]
+        new_ltv = float(existing["lifetime_value"] or 0) + total_amount
+        new_balance = max(0.0, float(existing["outstanding_balance"] or 0) + balance)
+        new_total_orders = int(existing["total_orders"] or 0) + 1
+        new_phone = telephone or existing["phone"] or ""
+        new_email = email or existing["email"] or ""
+        
+        db.execute(
+            """
+            UPDATE customers
+            SET lifetime_value = ?,
+                outstanding_balance = ?,
+                total_orders = ?,
+                phone = ?,
+                email = ?,
+                last_order_at = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (new_ltv, new_balance, new_total_orders, new_phone, new_email, created_at, created_at, cust_id),
+        )
+        return cust_id
+    else:
+        # Create new customer profile automatically
+        from services.customers_service import create_customer
+        new_cust_data = {
+            "id": customer_id or str(uuid.uuid4()),
+            "name": customer_name,
+            "phone": telephone,
+            "email": email,
+            "type": "individual",
+            "stage": "customer",
+            "lifetimeValue": total_amount,
+            "outstandingBalance": balance,
+            "totalOrders": 1,
+            "lastOrderAt": created_at,
+            "createdAt": created_at,
+            "updatedAt": created_at,
+        }
+        res = create_customer(new_cust_data)
+        return res[0]["id"] if res else None
+
+
+def sync_debtor_from_sale(sale, receipt_number, created_at, cust_id):
+    balance = float(sale.get("balance") or 0)
+    customer_name = (sale.get("customer") or "").strip()
+    if balance <= 0 or not customer_name or customer_name.lower() == "walk-in":
+        return None
+
+    db = get_db()
+    existing_entry = db.execute(
+        "SELECT id FROM ledger_entries WHERE reference = ? AND kind = 'debtor'",
+        (receipt_number,),
+    ).fetchone()
+
+    if existing_entry:
+        return existing_entry["id"]
+
+    from datetime import timedelta
+    total_amount = float(sale.get("totalAmount") or 0)
+    deposit = float(sale.get("deposit") or 0)
+    issue_date = created_at[:10] if len(created_at) >= 10 else datetime.now(timezone.utc).date().isoformat()
+
+    try:
+        dt_issue = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        dt_issue = datetime.now(timezone.utc)
+
+    due_date = (dt_issue + timedelta(days=14)).date().isoformat()
+    entry_id = str(uuid.uuid4())
+    status = "partial" if deposit > 0 else "open"
+    notes = f"Sale transaction {receipt_number} from Transactions page"
+
+    db.execute(
+        """
+        INSERT INTO ledger_entries (
+            id, kind, reference, party_name, party_ref, issue_date, due_date,
+            amount, currency, paid, status, notes, promise_to_pay, tags,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            entry_id,
+            "debtor",
+            receipt_number,
+            customer_name,
+            cust_id or sale.get("telephone") or sale.get("email") or "",
+            issue_date,
+            due_date,
+            total_amount,
+            "UGX",
+            deposit,
+            status,
+            notes,
+            None,
+            json.dumps(["sales", "debtor"]),
+            created_at,
+            created_at,
+        ),
+    )
+
+    if deposit > 0:
+        db.execute(
+            """
+            INSERT INTO ledger_payments (
+                id, entry_id, date, amount, method, reference, note, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                entry_id,
+                issue_date,
+                deposit,
+                sale.get("paymentMethod") or "cash",
+                receipt_number,
+                "Upfront payment at checkout",
+                created_at,
+            ),
+        )
+
+    return entry_id

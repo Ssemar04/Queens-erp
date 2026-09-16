@@ -43,6 +43,12 @@ const CODE128B_PATTERNS: number[][] = [
 const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX" }).format(n || 0);
 
+export function getLastName(name: string): string {
+  if (!name || !name.trim()) return "";
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1];
+}
+
 export interface ReceiptSummary {
   receipt: string;
   item: string;
@@ -232,36 +238,31 @@ export function printReceipt(
         <main class="receipt">
           <header class="center">
             <h1 class="company">${escapeHtml(company.name)}</h1>
-            ${company.address ? `<div class="subtle">${escapeHtml(company.address)}</div>` : ""}
             ${locationLine ? `<div class="subtle">${escapeHtml(locationLine)}</div>` : ""}
             ${contactLine ? `<div class="subtle">Contact: ${escapeHtml(contactLine)}</div>` : ""}
-            ${company.taxId ? `<div class="subtle">Tax ID: ${escapeHtml(company.taxId)}</div>` : ""}
             <div class="receipt-id mono">RECEIPT ${escapeHtml(r.receipt)}</div>
           </header>
 
           <div class="rule"></div>
-          <div class="row"><span>Sold</span><strong>${escapeHtml(soldAt)}</strong></div>
+          <div class="row"><span>Served</span><strong>${escapeHtml(soldAt)}</strong></div>
           <div class="row"><span>Printed</span><strong>${escapeHtml(printedAt)}</strong></div>
           <div class="row"><span>Customer</span><strong>${escapeHtml(r.customer)}</strong></div>
-          <div class="row"><span>Staff</span><strong>${escapeHtml(r.staff)}</strong></div>
-          <div class="row"><span>Status</span><strong>${escapeHtml(r.status)}</strong></div>
+          <div class="row"><span>Staff</span><strong>${escapeHtml(getLastName(r.staff))}</strong></div>
           <div class="rule"></div>
 
           ${linesHtml}
 
           <div class="rule"></div>
           <div class="row"><span>Subtotal</span><strong>${escapeHtml(fmtMoney(subtotal))}</strong></div>
-          <div class="row"><span>Discount</span><strong>${escapeHtml(fmtMoney(totalDiscount))}</strong></div>
-          <div class="row"><span>VAT</span><strong>${escapeHtml(fmtMoney(totalVat))}</strong></div>
+          ${totalDiscount > 0 ? `<div class="row"><span>Discount</span><strong>${escapeHtml(fmtMoney(totalDiscount))}</strong></div>` : ""}
+          ${totalVat > 0 ? `<div class="row"><span>VAT</span><strong>${escapeHtml(fmtMoney(totalVat))}</strong></div>` : ""}
           <div class="row total"><span>Total</span><span>${escapeHtml(fmtMoney(r.total))}</span></div>
-          <div class="row"><span>Paid</span><strong>${escapeHtml(fmtMoney(r.deposit))}</strong></div>
           <div class="row"><span>Balance</span><strong>${escapeHtml(fmtMoney(r.balance))}</strong></div>
           <div class="row"><span>Payment</span><strong>${escapeHtml(METHOD_LABEL[r.method] ?? r.method)}</strong></div>
 
           <footer class="center">
             <div class="barcode">${renderBarcodeSVG(r.receipt)}</div>
             <div class="mono">${escapeHtml(r.receipt)}</div>
-            <div class="verify">Scan the barcode in Transactions search, or verify at ${escapeHtml(verifyUrl)}</div>
             <p class="slogan">${escapeHtml(company.receiptSlogan || "Thank you for your business.")}</p>
           </footer>
         </main>

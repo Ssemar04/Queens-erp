@@ -47,6 +47,12 @@ interface Props {
   onUpdateStatus?: (receiptNumber: string, status: TransactionStatus) => Promise<void> | void;
 }
 
+export function getLastName(name: string): string {
+  if (!name || !name.trim()) return "";
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1];
+}
+
 const TRANSACTION_STATUSES: TransactionStatus[] = ["paid", "partial", "pending", "void"];
 
 const PER_PAGE = 25;
@@ -69,48 +75,29 @@ const METHOD_LABEL: Record<string, string> = {
 const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-UG", { style: "currency", currency: "UGX" }).format(n || 0);
 
+const hasBalance = (n: number) => n > 0;
+
 type RangeFilter = "any" | "zero" | "positive";
 
 function StatusEditor({
-  receipt,
   currentStatus,
-  disabled,
-  onUpdate,
   isSmall = false,
 }: {
-  receipt: string;
+  receipt?: string;
   currentStatus: TransactionStatus;
-  disabled: boolean;
+  disabled?: boolean;
   onUpdate?: (receipt: string, status: TransactionStatus) => Promise<void> | void;
   isSmall?: boolean;
 }) {
-  if (!onUpdate) {
-    return (
-      <Badge variant="outline" className={`${STATUS_STYLES[currentStatus]} ${isSmall ? "text-[10px]" : ""}`}>
-        {currentStatus}
-      </Badge>
-    );
-  }
   return (
-    <Select
-      defaultValue={currentStatus}
-      value={currentStatus}
-      onValueChange={(value) => onUpdate(receipt, value as TransactionStatus)}
-      disabled={disabled}
+    <Badge
+      variant="outline"
+      className={`${STATUS_STYLES[currentStatus] || STATUS_STYLES.pending} capitalize ${
+        isSmall ? "px-1.5 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs"
+      }`}
     >
-      <SelectTrigger
-        className={`${STATUS_STYLES[currentStatus]} ${isSmall ? "h-7 px-2 text-[11px]" : "h-8"} border-0 font-medium`}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {TRANSACTION_STATUSES.map((s) => (
-          <SelectItem key={s} value={s}>
-            {s}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      {currentStatus}
+    </Badge>
   );
 }
 
@@ -121,7 +108,6 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
   const [staff, setStaff] = useState("all");
   const [status, setStatus] = useState("all");
   const [itemId, setItemId] = useState("all");
-  const [deposit, setDeposit] = useState<RangeFilter>("any");
   const [balance, setBalance] = useState<RangeFilter>("any");
   const [receiptTarget, setReceiptTarget] = useState<GroupedTransaction | null>(null);
   const [updatingReceipt, setUpdatingReceipt] = useState<string | null>(null);
@@ -157,8 +143,6 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
       if (customer !== "all" && t.customer !== customer) return false;
       if (staff !== "all" && t.staff !== staff) return false;
       if (status !== "all" && t.status !== status) return false;
-      if (deposit === "zero" && t.deposit !== 0) return false;
-      if (deposit === "positive" && t.deposit <= 0) return false;
       if (balance === "zero" && t.balance !== 0) return false;
       if (balance === "positive" && t.balance <= 0) return false;
       if (itemId !== "all") {
@@ -179,7 +163,7 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
       }
       return true;
     });
-  }, [transactions, customer, staff, status, itemId, deposit, balance, q, itemNameMap]);
+  }, [transactions, customer, staff, status, itemId, balance, q, itemNameMap]);
 
   const sorted = useMemo(
     () => [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
@@ -192,7 +176,7 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
 
   const clearFilters = () => {
     setQ(""); setCustomer("all"); setStaff("all"); setStatus("all");
-    setItemId("all"); setDeposit("any"); setBalance("any"); setPage(0);
+    setItemId("all"); setBalance("any"); setPage(0);
   };
 
   const filterBar = (
@@ -212,7 +196,7 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
         <SelectTrigger className="w-[140px] bg-white"><SelectValue placeholder="Staff" /></SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All staff</SelectItem>
-          {staffList.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          {staffList.map((s) => <SelectItem key={s} value={s}>{getLastName(s)}</SelectItem>)}
         </SelectContent>
       </Select>
       <Select value={itemId} onValueChange={setItemId}>
@@ -230,14 +214,6 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
           <SelectItem value="partial">Partial</SelectItem>
           <SelectItem value="pending">Pending</SelectItem>
           <SelectItem value="void">Void</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select value={deposit} onValueChange={(v) => setDeposit(v as RangeFilter)}>
-        <SelectTrigger className="w-[130px] bg-white"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">Any deposit</SelectItem>
-          <SelectItem value="positive">Deposit &gt; 0</SelectItem>
-          <SelectItem value="zero">No deposit</SelectItem>
         </SelectContent>
       </Select>
       <Select value={balance} onValueChange={(v) => setBalance(v as RangeFilter)}>
@@ -328,16 +304,18 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                     <div className="text-right font-mono">{r.qty}</div>
                     <div className="text-muted-foreground">Total</div>
                     <div className="text-right font-mono font-medium">{fmtMoney(r.total)}</div>
-                    <div className="text-muted-foreground">Deposit</div>
-                    <div className="text-right font-mono">{fmtMoney(r.deposit)}</div>
-                    <div className="text-muted-foreground">Balance</div>
-                    <div className="text-right font-mono">{fmtMoney(r.balance)}</div>
+                    {hasBalance(r.balance) && (
+                      <>
+                        <div className="text-muted-foreground">Balance</div>
+                        <div className="text-right font-mono text-amber-600">{fmtMoney(r.balance)}</div>
+                      </>
+                    )}
                     <div className="text-muted-foreground">Method</div>
                     <div className="text-right">{METHOD_LABEL[r.method] ?? r.method}</div>
                     <div className="text-muted-foreground">Customer</div>
                     <div className="text-right">{r.customer}</div>
                     <div className="text-muted-foreground">Staff</div>
-                    <div className="text-right">{r.staff}</div>
+                    <div className="text-right">{getLastName(r.staff)}</div>
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => setReceiptTarget(t)}>
@@ -356,6 +334,9 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
         <ReceiptDialog
           transaction={receiptTarget}
           itemNameMap={itemNameMap}
+          onUpdateStatus={onUpdateStatus}
+          updatingReceipt={updatingReceipt}
+          setUpdatingReceipt={setUpdatingReceipt}
           onOpenChange={(open) => {
             if (!open) setReceiptTarget(null);
           }}
@@ -376,7 +357,6 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
               <TableHead>Assets</TableHead>
               <TableHead className="w-[70px] text-right">Qty</TableHead>
               <TableHead className="w-[110px] text-right">Total</TableHead>
-              <TableHead className="w-[110px] text-right">Deposit</TableHead>
               <TableHead className="w-[110px] text-right">Balance</TableHead>
               <TableHead className="w-[100px]">Method</TableHead>
               <TableHead>Customer</TableHead>
@@ -387,7 +367,7 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
           </TableHeader>
           <TableBody>
             {paged.length === 0 ? (
-              <TableRow><TableCell colSpan={12} className="py-10 text-center text-sm text-muted-foreground">No transactions match these filters.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">No transactions match these filters.</TableCell></TableRow>
             ) : paged.map((t) => {
               const r = getReceiptSummary(t, itemNameMap);
               return (
@@ -415,15 +395,12 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                   <TableCell className="text-right font-mono font-semibold">
                     {fmtMoney(r.total)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-emerald-600">
-                    {fmtMoney(r.deposit)}
-                  </TableCell>
                   <TableCell
                     className={`text-right font-mono ${
-                      r.balance > 0 ? "text-amber-600" : "text-muted-foreground"
+                      hasBalance(r.balance) ? "text-amber-600" : "text-muted-foreground"
                     }`}
                   >
-                    {fmtMoney(r.balance)}
+                    {hasBalance(r.balance) ? fmtMoney(r.balance) : "—"}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="font-normal">
@@ -431,7 +408,7 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">{r.customer}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{r.staff}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{getLastName(r.staff)}</TableCell>
                   <TableCell>
                     <StatusEditor
                       receipt={r.receipt}
@@ -461,7 +438,20 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                         <DropdownMenuItem onSelect={() => printReceipt(t, itemNameMap, settings.companyDetails)}>
                           <Printer className="mr-2 h-4 w-4" /> Print
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          disabled={!onUpdateStatus || r.status === "void" || (updatingReceipt !== null && updatingReceipt !== r.receipt)}
+                          onSelect={async () => {
+                            if (onUpdateStatus) {
+                              try {
+                                setUpdatingReceipt(r.receipt);
+                                await onUpdateStatus(r.receipt, "void");
+                              } finally {
+                                setUpdatingReceipt(null);
+                              }
+                            }
+                          }}
+                        >
                           <Ban className="mr-2 h-4 w-4" /> Void
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -477,6 +467,9 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
       <ReceiptDialog
         transaction={receiptTarget}
         itemNameMap={itemNameMap}
+        onUpdateStatus={onUpdateStatus}
+        updatingReceipt={updatingReceipt}
+        setUpdatingReceipt={setUpdatingReceipt}
         onOpenChange={(open) => {
           if (!open) setReceiptTarget(null);
         }}
@@ -488,10 +481,16 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
 function ReceiptDialog({
   transaction,
   itemNameMap,
+  onUpdateStatus,
+  updatingReceipt,
+  setUpdatingReceipt,
   onOpenChange,
 }: {
   transaction: GroupedTransaction | null;
   itemNameMap: Map<string, string>;
+  onUpdateStatus?: (receiptNumber: string, status: TransactionStatus) => Promise<void> | void;
+  updatingReceipt: string | null;
+  setUpdatingReceipt: (receipt: string | null) => void;
   onOpenChange: (open: boolean) => void;
 }) {
   const { settings } = useSettings();
@@ -511,9 +510,19 @@ function ReceiptDialog({
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-background/10">
                     <Receipt className="h-5 w-5" />
                   </span>
-                  <span className="rounded-full border border-background/20 px-3 py-1 font-mono text-xs uppercase">
-                    {r.status}
-                  </span>
+                  <StatusEditor
+                    receipt={r.receipt}
+                    currentStatus={r.status}
+                    disabled={updatingReceipt !== null && updatingReceipt !== r.receipt}
+                    onUpdate={onUpdateStatus ? async (receipt, status) => {
+                      try {
+                        setUpdatingReceipt(receipt);
+                        await onUpdateStatus(receipt, status);
+                      } finally {
+                        setUpdatingReceipt(null);
+                      }
+                    } : undefined}
+                  />
                 </div>
                 <DialogTitle className="font-mono text-xl">{r.receipt}</DialogTitle>
                 <DialogDescription className="text-background/70">
@@ -524,7 +533,7 @@ function ReceiptDialog({
 
             <div className="space-y-5 px-6 py-5">
               <div className="grid gap-3 sm:grid-cols-3">
-                <ReceiptMeta icon={CalendarClock} label="Sold" value={format(new Date(r.time), "MMM d, yyyy HH:mm")} />
+                <ReceiptMeta icon={CalendarClock} label="Served" value={format(new Date(r.time), "MMM d, yyyy HH:mm")} />
                 <ReceiptMeta icon={User} label="Customer" value={r.customer} />
                 <ReceiptMeta icon={CreditCard} label="Payment" value={METHOD_LABEL[r.method] ?? r.method} />
               </div>
@@ -554,16 +563,15 @@ function ReceiptDialog({
 
               <div className="space-y-2 rounded-md bg-muted/40 p-4">
                 <ReceiptLine label="Subtotal" value={fmtMoney(subtotal)} />
-                <ReceiptLine label="Discount" value={fmtMoney(totalDiscount)} />
-                <ReceiptLine label="VAT" value={fmtMoney(totalVat)} />
+                {totalDiscount > 0 && <ReceiptLine label="Discount" value={fmtMoney(totalDiscount)} />}
+                {totalVat > 0 && <ReceiptLine label="VAT" value={fmtMoney(totalVat)} />}
                 <ReceiptLine label="Total" value={fmtMoney(r.total)} strong />
-                <ReceiptLine label="Paid" value={fmtMoney(r.deposit)} tone="emerald" />
-                <ReceiptLine label="Balance" value={fmtMoney(r.balance)} tone={r.balance > 0 ? "amber" : "muted"} />
+                {hasBalance(r.balance) && <ReceiptLine label="Balance" value={fmtMoney(r.balance)} tone="amber" />}
                 <ReceiptLine label="Change" value={fmtMoney(r.lineItems.length > 0 && transaction.saleDetails?.changeDue ? transaction.saleDetails.changeDue : 0)} />
               </div>
 
               <div className="grid gap-2 text-sm sm:grid-cols-2">
-                <ReceiptPlain label="Staff" value={r.staff} />
+                <ReceiptPlain label="Staff" value={getLastName(r.staff)} />
                 <ReceiptPlain label="Reference" value={r.reference} />
                 {r.telephone && <ReceiptPlain label="Telephone" value={r.telephone} />}
                 {r.email && <ReceiptPlain label="Email" value={r.email} />}

@@ -123,8 +123,10 @@ def create_payment(entry_id, payment):
 
     create_payment_row(entry_id, payment)
     row, _ = entry
-    paid = float(row["paid"] or 0) + float(payment.get("amount") or 0)
-    status = compute_status(row["status"], float(row["amount"] or 0), paid, row["due_date"])
+    payment_amt = float(payment.get("amount") or 0)
+    paid = float(row["paid"] or 0) + payment_amt
+    total_amt = float(row["amount"] or 0)
+    status = compute_status(row["status"], total_amt, paid, row["due_date"])
 
     get_db().execute(
         """
@@ -134,6 +136,33 @@ def create_payment(entry_id, payment):
         """,
         (paid, status, entry_id),
     )
+
+    # Sync debtor payment with customers table and transactions table
+    if row["kind"] == "debtor":
+        party_name = row["party_name"]
+        party_ref = row["party_ref"] or ""
+        
+        get_db().execute(
+            """
+            UPDATE customers
+            SET outstanding_balance = MAX(0.0, outstanding_balance - ?),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? OR LOWER(name) = LOWER(?) OR phone = ?
+            """,
+            (payment_amt, party_ref, party_name, party_ref),
+        )
+
+        rem_balance = max(0.0, total_amt - paid)
+        new_txn_status = "paid" if rem_balance == 0 else "partial"
+        get_db().execute(
+            """
+            UPDATE transactions
+            SET balance = ?, amount_paid = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE transaction_number = ?
+            """,
+            (rem_balance, paid, new_txn_status, row["reference"]),
+        )
+
     get_db().commit()
     return get_entry(entry_id)
 

@@ -29,11 +29,11 @@ const blank = (ref: string): Customer => ({
   phone: "",
   address: "",
   city: "",
-  country: "Kenya",
+  country: "Uganda",
   industry: "",
   contactPerson: "",
   salesRep: "",
-  paymentTerms: "prepaid",
+  paymentTerms: "postpaid",
   creditLimit: 0,
   outstandingBalance: 0,
   lifetimeValue: 0,
@@ -165,11 +165,13 @@ export function CustomerFormSheet({ open, onOpenChange, existing, editing, onSav
               <Select value={c.paymentTerms} onValueChange={(v) => set("paymentTerms", v as Customer["paymentTerms"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="postpaid">Postpaid</SelectItem>
                   <SelectItem value="prepaid">Prepaid</SelectItem>
-                  <SelectItem value="net_7">Net 7</SelectItem>
-                  <SelectItem value="net_15">Net 15</SelectItem>
-                  <SelectItem value="net_30">Net 30</SelectItem>
-                  <SelectItem value="net_60">Net 60</SelectItem>
+                  {c.paymentTerms && !["postpaid", "prepaid"].includes(c.paymentTerms) && (
+                    <SelectItem value={c.paymentTerms}>
+                      {c.paymentTerms.replace("_", " ").toUpperCase()}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </Field>

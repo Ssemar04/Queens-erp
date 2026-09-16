@@ -56,12 +56,24 @@ const fmt = (n: number) =>
 
 const compact = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
+function getRawDigits(str: string): string {
+  return (str || "").replace(/\D/g, "");
+}
+
+export function getLastName(name: string): string {
+  if (!name || !name.trim()) return "";
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1];
+}
+
 function customerSearchText(customer: Customer) {
+  const phoneDigits = getRawDigits(customer.phone);
   return compact([
     customer.reference,
     customer.name,
     customer.email,
     customer.phone,
+    phoneDigits,
     customer.contactPerson,
     customer.taxId,
   ].filter(Boolean).join(" "));
@@ -84,9 +96,9 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
   const [unitPrice, setUnitPrice] = useState("0");
   const [discount, setDiscount] = useState("0");
   const [vatEnabled, setVatEnabled] = useState(false);
-  const [deposit, setDeposit] = useState("0");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [amountTendered, setAmountTendered] = useState("0");
+  const [isCustomTendered, setIsCustomTendered] = useState(false);
   const [staff, setStaff] = useState<string>("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerFocused, setCustomerFocused] = useState(false);
@@ -110,9 +122,9 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       setUnitPrice("0");
       setDiscount("0");
       setVatEnabled(false);
-      setDeposit("0");
       setPaymentMethod("cash");
       setAmountTendered("0");
+      setIsCustomTendered(false);
       setStaff(activeStaff[0]?.name ?? "");
       setSelectedCustomerId(null);
       setCustomerFocused(false);
@@ -169,20 +181,28 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
 
   const matchingCustomers = useMemo(() => {
     const query = compact(customer);
-    if (!query) return customers.slice(0, 6);
+    const queryDigits = getRawDigits(customer);
+    if (!query && !queryDigits) return customers.slice(0, 6);
 
     const terms = query.split(" ").filter(Boolean);
     return customers
-      .map((c) => ({ customer: c, text: customerSearchText(c) }))
-      .filter(({ text }) => terms.every((term) => text.includes(term)))
+      .map((c) => {
+        const phoneDigits = getRawDigits(c.phone);
+        const matchesDigits = queryDigits.length >= 3 && phoneDigits.includes(queryDigits);
+        const text = customerSearchText(c);
+        return { customer: c, text, matchesDigits };
+      })
+      .filter(({ text, matchesDigits }) => matchesDigits || terms.every((term) => text.includes(term)))
       .sort((a, b) => {
+        if (a.matchesDigits && !b.matchesDigits) return -1;
+        if (!a.matchesDigits && b.matchesDigits) return 1;
         const aName = compact(a.customer.name);
         const bName = compact(b.customer.name);
         const aStarts = aName.startsWith(query) ? 0 : 1;
         const bStarts = bName.startsWith(query) ? 0 : 1;
         return aStarts - bStarts || a.customer.name.localeCompare(b.customer.name);
       })
-      .slice(0, 6)
+      .slice(0, 8)
       .map(({ customer }) => customer);
   }, [customer, customers]);
 
@@ -229,15 +249,21 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
     return { subtotal: s, totalDiscount: d, totalVat: v };
   }, [lineItems]);
 
-  const dep = Math.max(0, parseFloat(deposit) || 0);
-  const tendered = Math.max(0, parseFloat(amountTendered) || 0);
-
   // If line items are present, use their totals; otherwise use single-item values
   const useCart = lineItems.length > 0;
   const currentSubTotal = useCart ? lineItemsSubtotal : qty * price;
   const currentAfterDiscount = Math.max(0, currentSubTotal - (useCart ? lineItemsDiscount : disc));
   const currentVat = useCart ? lineItemsVat : lineVat;
   const totalAmount = currentAfterDiscount + currentVat;
+
+  const effectiveTendered = isCustomTendered
+    ? Math.max(0, parseFloat(amountTendered) || 0)
+    : paymentMethod === "credit"
+    ? 0
+    : totalAmount;
+
+  const tendered = effectiveTendered;
+  const difference = tendered - totalAmount;
 
   const cumulativeAmount = useMemo(() => {
     const today = new Date().toDateString();
@@ -247,9 +273,12 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
     return todaySales + totalAmount;
   }, [movements, totalAmount]);
 
-  const balance = Math.max(0, totalAmount - dep);
-  const changeDue = Math.max(0, tendered - totalAmount);
+  // Balance (if negative difference) and Change Due (if positive difference)
+  const changeDue = difference > 0 ? difference : 0;
+  const balance = difference < 0 ? Math.abs(difference) : 0;
+  const dep = Math.min(tendered, totalAmount);
 
+  // Saved as completed sale ("paid") in the database automatically if balance = 0
   const status: TransactionStatus =
     balance === 0 ? "paid" : dep > 0 ? "partial" : "pending";
 
@@ -641,7 +670,19 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
             </div>
             <div>
               <Label className="mb-1.5 block text-sm">Method of payment</Label>
-              <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
+              <Select
+                value={paymentMethod}
+                onValueChange={(v) => {
+                  const pm = v as PaymentMethod;
+                  setPaymentMethod(pm);
+                  setIsCustomTendered(false);
+                  if (pm === "credit") {
+                    setAmountTendered("0");
+                  } else {
+                    setAmountTendered(String(totalAmount));
+                  }
+                }}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PAYMENT_METHODS.map((p) => (
@@ -650,25 +691,53 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="mb-1.5 block text-sm">Deposit</Label>
-                <Input type="number" min={0} step="0.01" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
+            <div>
+              <Label className="mb-1.5 block text-sm">Amount tendered</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={isCustomTendered ? amountTendered : String(effectiveTendered)}
+                onChange={(e) => {
+                  setAmountTendered(e.target.value);
+                  setIsCustomTendered(true);
+                }}
+                placeholder="Enter amount tendered"
+                className="font-mono text-base font-medium"
+              />
+            </div>
+
+            {/* Dynamic Calculation Cards: Balance & Change Due */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className={`rounded-lg border p-3 transition-colors ${difference < 0 ? "border-amber-300 bg-amber-50/70" : "border-border bg-muted/30"}`}>
+                <p className="text-xs text-muted-foreground">Balance</p>
+                <p className={`mt-0.5 font-mono text-base font-semibold ${difference < 0 ? "text-amber-700" : "text-muted-foreground"}`}>
+                  {fmt(balance)}
+                </p>
               </div>
-              <div>
-                <Label className="mb-1.5 block text-sm">Balance</Label>
-                <Input value={fmt(balance)} disabled className={`font-mono ${balance > 0 ? "text-amber-600" : ""}`} />
+              <div className={`rounded-lg border p-3 transition-colors ${difference > 0 ? "border-emerald-300 bg-emerald-50/70" : "border-border bg-muted/30"}`}>
+                <p className="text-xs text-muted-foreground">Change due</p>
+                <p className={`mt-0.5 font-mono text-base font-semibold ${difference > 0 ? "text-emerald-700 font-bold" : "text-muted-foreground"}`}>
+                  {fmt(changeDue)}
+                </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="mb-1.5 block text-sm">Amount tendered</Label>
-                <Input type="number" min={0} step="0.01" value={amountTendered} onChange={(e) => setAmountTendered(e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block text-sm">Change due</Label>
-                <Input value={fmt(changeDue)} disabled className="font-mono text-emerald-600" />
-              </div>
+
+            {/* Settlement Status Indicator */}
+            <div className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-xs">
+              <span className="text-muted-foreground">Settlement status:</span>
+              <Badge
+                variant="outline"
+                className={`capitalize font-medium ${
+                  status === "paid"
+                    ? "border-emerald-500/30 bg-emerald-50 text-emerald-700"
+                    : status === "partial"
+                    ? "border-amber-500/30 bg-amber-50 text-amber-700"
+                    : "border-sky-500/30 bg-sky-50 text-sky-700"
+                }`}
+              >
+                {status === "paid" ? "✓ Completed sale" : status === "partial" ? "Partial payment" : "Pending credit"}
+              </Badge>
             </div>
           </section>
 
@@ -681,10 +750,14 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
               <div>
                 <Label className="mb-1.5 block text-sm">Staff *</Label>
                 <Select value={staff} onValueChange={setStaff}>
-                  <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                  <SelectTrigger className="w-full bg-white">
+                    <SelectValue placeholder="Select staff">
+                      {staff ? getLastName(staff) : "Select staff"}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {activeStaff.map((e) => (
-                      <SelectItem key={e.id} value={e.name}>{e.name} · {e.role}</SelectItem>
+                      <SelectItem key={e.id} value={e.name}>{getLastName(e.name)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -699,7 +772,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                     onChange={(e) => updateCustomerName(e.target.value)}
                     onFocus={() => setCustomerFocused(true)}
                     onBlur={() => window.setTimeout(() => setCustomerFocused(false), 140)}
-                    placeholder={`${WALK_IN} or search database`}
+                    placeholder={`${WALK_IN} or search by name / telephone`}
                     className="pl-8 pr-8"
                   />
                   {selectedCustomer && (
@@ -749,8 +822,11 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                               <span className="truncate text-sm font-medium">{profile.name}</span>
                               <span className="shrink-0 text-[10px] text-muted-foreground">{profile.reference}</span>
                             </div>
-                            <div className="truncate text-xs text-muted-foreground">
-                              {[profile.phone, profile.email, profile.contactPerson].filter(Boolean).join(" · ")}
+                            <div className="truncate text-xs text-muted-foreground flex items-center gap-1.5">
+                              <span className="font-mono text-primary font-medium">{profile.phone || "No telephone"}</span>
+                              {[profile.email, profile.contactPerson].filter(Boolean).length > 0 && (
+                                <span>· {[profile.email, profile.contactPerson].filter(Boolean).join(" · ")}</span>
+                              )}
                             </div>
                           </div>
                         </button>

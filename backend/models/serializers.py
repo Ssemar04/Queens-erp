@@ -134,33 +134,6 @@ def movement_from_row(row):
             sale = json.loads(transaction_sale_details)
         except json.JSONDecodeError:
             sale = None
-        if sale is not None:
-            sale["status"] = get("transaction_status") or sale.get("status") or "paid"
-
-    if transaction_id and sale is None:
-        sale = {
-            "receiptNumber": get("transaction_number") or row["reference"],
-            "itemName": get("transaction_item_name") or "",
-            "unitPrice": get("transaction_unit_price", 0),
-            "totalAmount": get("transaction_total_amount", 0),
-            "discount": get("transaction_discount", 0),
-            "vat": get("transaction_tax", 0),
-            "vatRate": get("transaction_vat_rate", 0),
-            "cumulativeAmount": get("transaction_cumulative_amount", 0),
-            "deposit": get("transaction_amount_paid", 0),
-            "balance": get("transaction_balance", 0),
-            "paymentMethod": get("transaction_payment_method") or "cash",
-            "amountTendered": get("transaction_amount_tendered", 0),
-            "changeDue": get("transaction_change_due", 0),
-            "staff": get("transaction_created_by") or row["performed_by"],
-            "customerId": get("transaction_customer_id"),
-            "customer": get("transaction_customer_name") or "Walk-in",
-            "telephone": get("transaction_telephone") or "",
-            "email": get("transaction_email") or "",
-            "status": get("transaction_status") or "paid",
-            "assetId": get("transaction_asset_id"),
-            "assetName": get("transaction_asset_name"),
-        }
 
     if sale is None:
         try:
@@ -171,6 +144,89 @@ def movement_from_row(row):
                     sale = None
         except (KeyError, IndexError):
             pass
+
+    if transaction_id:
+        if sale is None:
+            sale = {}
+
+        receipt_num = get("transaction_number") or row["reference"]
+        if receipt_num:
+            sale["receiptNumber"] = receipt_num
+
+        item_name = get("transaction_item_name")
+        if item_name is not None:
+            sale["itemName"] = item_name
+
+        if get("transaction_unit_price") is not None:
+            sale["unitPrice"] = float(get("transaction_unit_price") or 0)
+
+        if get("transaction_total_amount") is not None:
+            sale["totalAmount"] = float(get("transaction_total_amount") or 0)
+
+        if get("transaction_discount") is not None:
+            sale["discount"] = float(get("transaction_discount") or 0)
+
+        if get("transaction_tax") is not None:
+            sale["vat"] = float(get("transaction_tax") or 0)
+
+        if get("transaction_vat_rate") is not None:
+            sale["vatRate"] = float(get("transaction_vat_rate") or 0)
+
+        if get("transaction_cumulative_amount") is not None:
+            sale["cumulativeAmount"] = float(get("transaction_cumulative_amount") or 0)
+
+        if get("transaction_amount_paid") is not None:
+            sale["deposit"] = float(get("transaction_amount_paid") or 0)
+
+        if get("transaction_balance") is not None:
+            sale["balance"] = float(get("transaction_balance") or 0)
+
+        if get("transaction_amount_tendered") is not None:
+            sale["amountTendered"] = float(get("transaction_amount_tendered") or 0)
+
+        if get("transaction_change_due") is not None:
+            sale["changeDue"] = float(get("transaction_change_due") or 0)
+
+        pm = get("transaction_payment_method")
+        if pm:
+            sale["paymentMethod"] = pm
+
+        st = get("transaction_status")
+        if st:
+            sale["status"] = st
+
+        cb = get("transaction_created_by") or row["performed_by"]
+        if cb:
+            sale["staff"] = cb
+
+        cid = get("transaction_customer_id")
+        if cid is not None:
+            sale["customerId"] = cid
+
+        cn = get("transaction_customer_name")
+        if cn is not None:
+            sale["customer"] = cn or "Walk-in"
+
+        tp = get("transaction_telephone")
+        if tp is not None:
+            sale["telephone"] = tp
+
+        em = get("transaction_email")
+        if em is not None:
+            sale["email"] = em
+
+        aid = get("transaction_asset_id")
+        if aid is not None:
+            sale["assetId"] = aid
+
+        an = get("transaction_asset_name")
+        if an is not None:
+            sale["assetName"] = an
+    elif sale is not None:
+        sale.setdefault("receiptNumber", row["reference"])
+        sale.setdefault("status", "paid")
+        sale.setdefault("customer", "Walk-in")
+        sale.setdefault("staff", row["performed_by"])
 
     return {
         "id": row["id"],

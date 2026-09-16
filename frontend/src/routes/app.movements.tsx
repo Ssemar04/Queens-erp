@@ -16,6 +16,7 @@ import {
   fetchCatalogServiceItems,
   fetchMovementTransactions,
   saveMovementTransactions,
+  updateMovementTransactionStatus,
 } from "@/lib/movements-backend-api";
 
 export const Route = createFileRoute("/app/movements")({
@@ -73,7 +74,14 @@ function groupTransactions(movements: StockMovement[]): GroupedTransaction[] {
       createdAt: firstMovement?.createdAt ?? new Date(0).toISOString(),
       customer: saleDetails?.customer || "Walk-in",
       staff: saleDetails?.staff || firstMovement?.performedBy || "",
-      status: saleDetails?.status ?? "paid",
+      status:
+        saleDetails?.status === "void"
+          ? "void"
+          : (saleDetails?.balance ?? 0) <= 0
+          ? "paid"
+          : (saleDetails?.deposit ?? 0) > 0
+          ? "partial"
+          : "pending",
       paymentMethod: saleDetails?.paymentMethod ?? "",
       totalItems,
       totalAmount: saleDetails?.totalAmount ?? 0,
@@ -111,9 +119,8 @@ function TransactionsPage() {
 
   const stats = useMemo(() => {
     const total = transactions.reduce((s, transaction) => s + transaction.totalAmount, 0);
-    const collected = transactions.reduce((s, transaction) => s + transaction.deposit, 0);
     const outstanding = transactions.reduce((s, transaction) => s + transaction.balance, 0);
-    return { count: transactions.length, total, collected, outstanding };
+    return { count: transactions.length, total, outstanding };
   }, [transactions]);
 
   const csvColumns = useMemo<CSVColumn<GroupedTransaction>[]>(() => [
@@ -129,7 +136,6 @@ function TransactionsPage() {
     },
     { header: "Quantity", accessor: (transaction) => transaction.totalItems },
     { header: "Total", accessor: (transaction) => transaction.totalAmount },
-    { header: "Deposit", accessor: (transaction) => transaction.deposit },
     { header: "Balance", accessor: (transaction) => transaction.balance },
     { header: "Method", accessor: (transaction) => transaction.paymentMethod },
     { header: "Customer", accessor: (transaction) => transaction.customer },
@@ -140,7 +146,6 @@ function TransactionsPage() {
   const statPills = [
     { label: "Transactions", value: String(stats.count) },
     { label: "Gross sales", value: fmt(stats.total) },
-    { label: "Collected", value: fmt(stats.collected), tone: "emerald" },
     { label: "Outstanding", value: fmt(stats.outstanding), tone: "amber" },
   ];
 
@@ -152,6 +157,8 @@ function TransactionsPage() {
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["backend", "movements"] }),
             queryClient.invalidateQueries({ queryKey: ["backend", "movement-items"] }),
+            queryClient.invalidateQueries({ queryKey: ["backend", "customers"] }),
+            queryClient.invalidateQueries({ queryKey: ["db", "customers"] }),
             queryClient.invalidateQueries({ queryKey: ["db", "stock_movements"] }),
             queryClient.invalidateQueries({ queryKey: ["db", "items"] }),
           ]);
@@ -166,6 +173,25 @@ function TransactionsPage() {
         .finally(() => {
           setIsSaving(false);
         });
+    },
+    [queryClient],
+  );
+
+  const handleUpdateStatus = useCallback(
+    async (receiptNumber: string, newStatus: TransactionStatus) => {
+      try {
+        await updateMovementTransactionStatus(receiptNumber, newStatus);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["backend", "movements"] }),
+          queryClient.invalidateQueries({ queryKey: ["backend", "movement-items"] }),
+          queryClient.invalidateQueries({ queryKey: ["db", "stock_movements"] }),
+          queryClient.invalidateQueries({ queryKey: ["db", "transactions"] }),
+        ]);
+        toast.success(`Transaction ${receiptNumber} updated to ${newStatus}`);
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        toast.error(error.message || "Failed to update transaction status");
+      }
     },
     [queryClient],
   );
@@ -190,7 +216,7 @@ function TransactionsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {statPills.map((s) => (
           <div
             key={s.label}
@@ -222,7 +248,7 @@ function TransactionsPage() {
             onAction={() => setFormOpen(true)}
           />
         ) : (
-          <TransactionsTable transactions={transactions} itemNameMap={itemNameMap} />
+          <TransactionsTable transactions={transactions} itemNameMap={itemNameMap} onUpdateStatus={handleUpdateStatus} />
         )}
       </ErrorBoundary>
 

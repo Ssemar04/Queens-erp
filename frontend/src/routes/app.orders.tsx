@@ -49,8 +49,9 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
-import { createOrder, deleteOrder, getOrders, updateOrder } from "@/services/api";
+import { createOrder, deleteOrder, getEmployees, getOrders, updateOrder } from "@/services/api";
 import type { OrderStatus, QuotationAttachment, SalesOrder } from "@/types/sales-order";
+import type { Employee } from "@/components/employees/employees-store";
 
 export const Route = createFileRoute("/app/orders")({
   component: OrdersPage,
@@ -77,6 +78,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 
 function OrdersPage() {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
@@ -86,7 +88,12 @@ function OrdersPage() {
   const loadDatabaseOrders = useCallback(async () => {
     setLoading(true);
     try {
-      setOrders(await getOrders());
+      const [fetchedOrders, fetchedEmployees] = await Promise.all([
+        getOrders(),
+        getEmployees().catch(() => []),
+      ]);
+      setOrders(fetchedOrders);
+      setEmployees(fetchedEmployees);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load orders";
       toast.error(message);
@@ -151,6 +158,17 @@ function OrdersPage() {
       toast.success("Status updated");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update status";
+      toast.error(message);
+    }
+  }
+
+  async function handleHandledByChange(id: string, handledBy: string) {
+    try {
+      const updated = await updateOrder(id, { handledBy });
+      setOrders((current) => current.map((o) => (o.id === id ? updated : o)));
+      toast.success(`Handled by updated to ${handledBy}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update handler";
       toast.error(message);
     }
   }
@@ -297,12 +315,32 @@ function OrdersPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center gap-1.5 text-sm">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                          {o.handledBy.split(" ").map((p) => p[0]).slice(0, 2).join("")}
-                        </span>
-                        {o.handledBy}
-                      </span>
+                      <Select
+                        value={o.handledBy}
+                        onValueChange={(v) => handleHandledByChange(o.id, v)}
+                      >
+                        <SelectTrigger className="h-7 min-w-[150px] border-0 bg-transparent p-0 hover:bg-muted/40 font-normal shadow-none focus:ring-0">
+                          <span className="inline-flex items-center gap-1.5 text-sm truncate">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                              {o.handledBy ? o.handledBy.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase() : "?"}
+                            </span>
+                            <span className="truncate">{o.handledBy || "Select employee"}</span>
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {employees.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.name}>
+                              <div className="flex items-center gap-2">
+                                <span>{emp.name}</span>
+                                <span className="text-xs text-muted-foreground">({emp.role || emp.department || "Staff"})</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                          {o.handledBy && !employees.some((e) => e.name === o.handledBy) && (
+                            <SelectItem value={o.handledBy}>{o.handledBy}</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
                       UGX {o.amount.toLocaleString()}
@@ -351,6 +389,7 @@ function OrdersPage() {
         nextLpo={nextLpo(orders)}
         onCreate={handleCreate}
         submitting={saving}
+        employees={employees}
       />
     </div>
   );
@@ -386,12 +425,14 @@ function OrderFormSheet({
   nextLpo,
   onCreate,
   submitting,
+  employees,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   nextLpo: string;
   onCreate: (o: SalesOrder) => void;
   submitting: boolean;
+  employees: Employee[];
 }) {
   const [lpoNumber, setLpo] = useState(nextLpo);
   const [dateReceived, setDateReceived] = useState(todayISO());
@@ -412,11 +453,11 @@ function OrderFormSheet({
       setCustomerQuotation("");
       setQuotationAttachment(null);
       setDelivery("");
-      setHandledBy("");
+      setHandledBy(employees[0]?.name || "");
       setAmount("");
       setNotes("");
     }
-  }, [open, nextLpo]);
+  }, [open, nextLpo, employees]);
 
   const valid =
     lpoNumber.trim() && dateReceived && customerName.trim() && dateToBeDelivered && handledBy.trim();
@@ -522,11 +563,24 @@ function OrderFormSheet({
               <Input type="date" value={dateToBeDelivered} onChange={(e) => setDelivery(e.target.value)} />
             </Field>
             <Field label="Handled by" icon={User}>
-              <Input
-                value={handledBy}
-                onChange={(e) => setHandledBy(e.target.value)}
-                placeholder="Staff name"
-              />
+              <Select value={handledBy} onValueChange={setHandledBy}>
+                <SelectTrigger className="w-full bg-white">
+                  <SelectValue placeholder="Select an employee..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.name}>
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span>{emp.name}</span>
+                        <span className="text-xs text-muted-foreground">({emp.role || emp.department || "Staff"})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {handledBy && !employees.some((e) => e.name === handledBy) && (
+                    <SelectItem value={handledBy}>{handledBy}</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </Field>
           </div>
 
@@ -552,7 +606,6 @@ function OrderFormSheet({
             />
           </div>
         </div>
-
 
         <SheetFooter className="mt-6">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

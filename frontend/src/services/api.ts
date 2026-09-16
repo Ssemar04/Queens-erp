@@ -559,7 +559,7 @@ export interface Customer {
   website?: string;
   contactPerson?: string;
   salesRep: string;
-  paymentTerms: "prepaid" | "net_7" | "net_15" | "net_30" | "net_60";
+  paymentTerms: "postpaid" | "prepaid" | "net_7" | "net_15" | "net_30" | "net_60" | string;
   creditLimit: number;
   outstandingBalance: number;
   lifetimeValue: number;
