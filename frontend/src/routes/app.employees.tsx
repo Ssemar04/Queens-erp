@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Search, Users, UserCheck, UserMinus, MapPin, LayoutGrid, List as ListIcon, Mail, Phone, Trash2 } from "lucide-react";
+import { Plus, Search, Users, UserCheck, UserMinus, MapPin, LayoutGrid, List as ListIcon, Mail, Phone, Trash2, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
+import { useRole } from "@/hooks/useRole";
 import {
   useEmployees,
+  useDepartments,
   employeeInitials,
   STATUS_LABEL,
   type Employee,
@@ -20,6 +22,7 @@ import {
 import { EmployeeFormSheet } from "@/components/employees/EmployeeFormSheet";
 import { EmployeeDetailSheet } from "@/components/employees/EmployeeDetailSheet";
 import { OneTimeCredentialsModal } from "@/components/employees/OneTimeCredentialsModal";
+import { DepartmentManagerModal } from "@/components/employees/DepartmentManagerModal";
 import type { EmployeeOneTimeCredentials } from "@/services/api";
 
 import { useBranch } from "@/contexts/BranchContext";
@@ -38,6 +41,8 @@ const STATUS_CLS: Record<EmployeeStatus, string> = {
 
 function EmployeesPage() {
   const { employees, add, update, remove, replace } = useEmployees();
+  const { departments, addDepartment, editDepartment, deleteDepartment } = useDepartments();
+  const { isAdmin } = useRole();
   const { branches: companyBranches } = useBranch();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
@@ -46,6 +51,9 @@ function EmployeesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [active, setActive] = useState<Employee | null>(null);
+
+  // Department Manager Modal State
+  const [deptModalOpen, setDeptModalOpen] = useState(false);
 
   // Credentials Modal State
   const [credModalOpen, setCredModalOpen] = useState(false);
@@ -126,7 +134,15 @@ function EmployeesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Employees</h1>
           <p className="text-sm text-muted-foreground">Personnel directory grouped by branch locations</p>
         </div>
-        <Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4 mr-1.5" />Add employee</Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setDeptModalOpen(true)}>
+              <Building2 className="h-4 w-4 mr-1.5" />
+              Manage departments
+            </Button>
+          )}
+          <Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4 mr-1.5" />Add employee</Button>
+        </div>
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -268,6 +284,14 @@ function EmployeesPage() {
         onOpenChange={setCredModalOpen}
         employeeName={createdEmpName}
         credentials={createdCredentials}
+      />
+      <DepartmentManagerModal
+        open={deptModalOpen}
+        onOpenChange={setDeptModalOpen}
+        departments={departments}
+        onAdd={addDepartment}
+        onEdit={editDepartment}
+        onDelete={deleteDepartment}
       />
     </div>
   );

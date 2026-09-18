@@ -146,6 +146,39 @@ export function getReceiptSummary(t: GroupedTransaction, itemNameMap: Map<string
   };
 }
 
+import type { Location } from "@/types/inventory";
+
+export function getBranchReceiptCompanyDetails(
+  company: CompanyDetails,
+  branch?: Location | null
+): CompanyDetails {
+  if (!branch) return company;
+
+  const branchAddress = [branch.street, branch.building, branch.floor, branch.roomNumber]
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
+    .filter(Boolean)
+    .join(", ");
+
+  const contactLine =
+    branch.contactLine?.trim() ||
+    [branch.phone, branch.email].filter((s) => Boolean(s && s.trim())).join(" / ") ||
+    company.contactLine;
+
+  return {
+    name: branch.receiptTitle?.trim() || branch.name || company.name,
+    email: branch.email?.trim() || company.email,
+    phone: branch.phone?.trim() || company.phone,
+    address: branchAddress || branch.address || company.address,
+    location: branch.name || company.location,
+    floorNumber: branch.floor || company.floorNumber,
+    roomNumber: branch.roomNumber || company.roomNumber,
+    contactLine,
+    receiptSlogan: branch.receiptSlogan?.trim() || company.receiptSlogan,
+    receiptVerificationBaseUrl: branch.receiptVerificationBaseUrl?.trim() || company.receiptVerificationBaseUrl,
+    taxId: branch.taxId?.trim() || company.taxId,
+  };
+}
+
 function verificationUrl(receipt: string, company: CompanyDetails) {
   const configured = company.receiptVerificationBaseUrl.trim();
   const base = configured || (typeof window !== "undefined" ? window.location.origin : "");
@@ -157,7 +190,9 @@ export function printReceipt(
   t: GroupedTransaction,
   itemNameMap: Map<string, string>,
   company: CompanyDetails,
+  branch?: Location | null,
 ) {
+  const effectiveCompany = getBranchReceiptCompanyDetails(company, branch);
   const r = getReceiptSummary(t, itemNameMap);
   const printedAt = format(new Date(), "dd/MM/yyyy HH:mm");
   const soldAt = format(new Date(r.time), "dd/MM/yyyy HH:mm");
@@ -167,9 +202,9 @@ export function printReceipt(
   const subtotal = r.lineItems.reduce((s, li) => s + li.unitPrice * li.quantity, 0);
   const totalDiscount = r.lineItems.reduce((s, li) => s + li.discount, 0);
   const totalVat = r.lineItems.reduce((s, li) => s + li.vat, 0);
-  const verifyUrl = verificationUrl(r.receipt, company);
-  const locationLine = [company.location, company.floorNumber, company.roomNumber].filter(Boolean).join(" - ");
-  const contactLine = company.contactLine || [company.phone, company.email].filter(Boolean).join(" / ");
+  const verifyUrl = verificationUrl(r.receipt, effectiveCompany);
+  const locationLine = [effectiveCompany.location, effectiveCompany.floorNumber, effectiveCompany.roomNumber].filter(Boolean).join(" - ");
+  const contactLine = effectiveCompany.contactLine || [effectiveCompany.phone, effectiveCompany.email].filter(Boolean).join(" / ");
 
   const linesHtml = r.lineItems.map((li) => {
     const assetHtml = li.assetName ? `<div class="subtle">Asset: ${escapeHtml(li.assetName)}</div>` : "";
@@ -237,9 +272,10 @@ export function printReceipt(
       <body>
         <main class="receipt">
           <header class="center">
-            <h1 class="company">${escapeHtml(company.name)}</h1>
+            <h1 class="company">${escapeHtml(effectiveCompany.name)}</h1>
             ${locationLine ? `<div class="subtle">${escapeHtml(locationLine)}</div>` : ""}
             ${contactLine ? `<div class="subtle">Contact: ${escapeHtml(contactLine)}</div>` : ""}
+            ${effectiveCompany.taxId ? `<div class="subtle">${escapeHtml(effectiveCompany.taxId)}</div>` : ""}
             <div class="receipt-id mono">RECEIPT ${escapeHtml(r.receipt)}</div>
           </header>
 
@@ -263,7 +299,7 @@ export function printReceipt(
           <footer class="center">
             <div class="barcode">${renderBarcodeSVG(r.receipt)}</div>
             <div class="mono">${escapeHtml(r.receipt)}</div>
-            <p class="slogan">${escapeHtml(company.receiptSlogan || "Thank you for your business.")}</p>
+            <p class="slogan">${escapeHtml(effectiveCompany.receiptSlogan || "Thank you for your business.")}</p>
           </footer>
         </main>
         <script>

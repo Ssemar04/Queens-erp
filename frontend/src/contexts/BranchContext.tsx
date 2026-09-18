@@ -31,9 +31,9 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   const [currentBranchId, setCurrentBranchId] = useState<string | null>(getStoredActiveBranch());
   const [isLoading, setIsLoading] = useState(true);
 
-  const appRole = user?.user_metadata?.role as string | undefined;
+  const appRole = ((user?.user_metadata?.role || (user as any)?.role) as string | undefined)?.toLowerCase();
   const isAdmin = appRole === "admin";
-  const userAssignedBranchId = (user?.user_metadata?.branchId as string | undefined) || null;
+  const userAssignedBranchId = ((user?.user_metadata?.branchId || (user as any)?.branchId) as string | undefined) || null;
   const isLocked = !isAdmin && Boolean(userAssignedBranchId);
 
   const refreshBranches = useCallback(async () => {

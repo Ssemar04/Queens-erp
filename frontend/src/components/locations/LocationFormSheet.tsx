@@ -31,6 +31,13 @@ const schema = z.object({
   floor: z.string().max(60),
   roomNumber: z.string().max(60),
   branchManager: z.string().min(1, "Branch manager is required").max(120),
+  receiptTitle: z.string().max(120).optional(),
+  phone: z.string().max(60).optional(),
+  email: z.string().max(100).optional(),
+  contactLine: z.string().max(120).optional(),
+  receiptSlogan: z.string().max(200).optional(),
+  taxId: z.string().max(60).optional(),
+  receiptVerificationBaseUrl: z.string().max(200).optional(),
   isActive: z.boolean(),
 });
 
@@ -63,6 +70,13 @@ export function LocationFormSheet({ open, onOpenChange, editLocation }: Location
       floor: "",
       roomNumber: "",
       branchManager: "",
+      receiptTitle: "",
+      phone: "",
+      email: "",
+      contactLine: "",
+      receiptSlogan: "",
+      taxId: "",
+      receiptVerificationBaseUrl: "",
       isActive: true,
     },
   });
@@ -77,6 +91,13 @@ export function LocationFormSheet({ open, onOpenChange, editLocation }: Location
         floor: editLocation.floor ?? "",
         roomNumber: editLocation.roomNumber ?? "",
         branchManager: editLocation.branchManager ?? "",
+        receiptTitle: editLocation.receiptTitle ?? "",
+        phone: editLocation.phone ?? "",
+        email: editLocation.email ?? "",
+        contactLine: editLocation.contactLine ?? "",
+        receiptSlogan: editLocation.receiptSlogan ?? "",
+        taxId: editLocation.taxId ?? "",
+        receiptVerificationBaseUrl: editLocation.receiptVerificationBaseUrl ?? "",
         isActive: editLocation.isActive,
       });
     } else if (open) {
@@ -87,6 +108,13 @@ export function LocationFormSheet({ open, onOpenChange, editLocation }: Location
         floor: "",
         roomNumber: "",
         branchManager: "",
+        receiptTitle: "",
+        phone: "",
+        email: "",
+        contactLine: "",
+        receiptSlogan: "",
+        taxId: "",
+        receiptVerificationBaseUrl: "",
         isActive: true,
       });
     }
@@ -105,6 +133,13 @@ export function LocationFormSheet({ open, onOpenChange, editLocation }: Location
             floor: values.floor,
             roomNumber: values.roomNumber,
             branchManager: values.branchManager,
+            receiptTitle: values.receiptTitle,
+            phone: values.phone,
+            email: values.email,
+            contactLine: values.contactLine,
+            receiptSlogan: values.receiptSlogan,
+            taxId: values.taxId,
+            receiptVerificationBaseUrl: values.receiptVerificationBaseUrl,
             address,
             isActive: values.isActive,
           },
@@ -127,6 +162,13 @@ export function LocationFormSheet({ open, onOpenChange, editLocation }: Location
         floor: values.floor,
         roomNumber: values.roomNumber,
         branchManager: values.branchManager,
+        receiptTitle: values.receiptTitle,
+        phone: values.phone,
+        email: values.email,
+        contactLine: values.contactLine,
+        receiptSlogan: values.receiptSlogan,
+        taxId: values.taxId,
+        receiptVerificationBaseUrl: values.receiptVerificationBaseUrl,
         isActive: values.isActive,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -237,6 +279,106 @@ export function LocationFormSheet({ open, onOpenChange, editLocation }: Location
                     <FormLabel>Branch Manager</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. Sarah Nakato" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Receipt Header & Footer Customization */}
+            <div className="rounded-lg border border-border/80 bg-slate-50/60 p-3.5 space-y-3">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  Receipt Header & Footer Customization
+                </h4>
+                <p className="text-[11px] text-muted-foreground">
+                  Customize receipt title, contact line, TIN/Tax ID, and footer slogan for transactions at this branch.
+                </p>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="receiptTitle"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Custom Receipt Header Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Queenstech ERP - Entebbe Branch" {...field} className="bg-white text-xs" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Branch Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. +256 700 000000" {...field} className="bg-white text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Branch Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. entebbe@queenstech.com" {...field} className="bg-white text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="contactLine"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Receipt Contact Line</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. +256 700 000000 / info@branch.com" {...field} className="bg-white text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="taxId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Branch Tax / TIN ID</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. TIN: 1000123456" {...field} className="bg-white text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="receiptSlogan"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Branch Receipt Footer Slogan</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Thank you for shopping at Entebbe Branch!" {...field} className="bg-white text-xs" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

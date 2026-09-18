@@ -1,5 +1,22 @@
 import { useState, useEffect, useMemo } from "react";
-import { Receipt, MoreHorizontal, Eye, Printer, Ban, Search, Boxes, User, CreditCard, CalendarClock } from "lucide-react";
+import {
+  Receipt,
+  MoreHorizontal,
+  Eye,
+  Printer,
+  Ban,
+  Search,
+  Boxes,
+  User,
+  CreditCard,
+  CalendarClock,
+  Share2,
+  FileText,
+  Image as ImageIcon,
+  Download,
+  Copy,
+  ChevronDown,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -22,6 +39,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -35,7 +53,9 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSettings } from "@/contexts/ThemeContext";
+import { useBranch } from "@/contexts/BranchContext";
 import { getReceiptSummary, printReceipt } from "@/components/transactions/receipt-printer";
+import { exportReceipt } from "@/components/transactions/receipt-exporter";
 import { format } from "date-fns";
 import type { StockMovement, TransactionStatus } from "@/types/inventory";
 import type { GroupedTransaction } from "@/routes/app.movements";
@@ -113,6 +133,17 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
   const [updatingReceipt, setUpdatingReceipt] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const { settings } = useSettings();
+  const { branches, selectedBranch } = useBranch();
+
+  const resolveBranch = (t: GroupedTransaction) => {
+    const m = t.movements[0];
+    const locId = m?.toLocationId || m?.fromLocationId || m?.toBranchId || m?.fromBranchId;
+    if (locId && branches.length > 0) {
+      const found = branches.find((b) => b.id === locId);
+      if (found) return found;
+    }
+    return selectedBranch;
+  };
 
   useEffect(() => {
     setQ(initialQuery);
@@ -318,11 +349,33 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                     <div className="text-right">{getLastName(r.staff)}</div>
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => setReceiptTarget(t)}>
-                      <Eye className="h-4 w-4" /> View receipt
+                    <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={() => setReceiptTarget(t)}>
+                      <Eye className="h-3.5 w-3.5" /> View
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => printReceipt(t, itemNameMap, settings.companyDetails)}>
-                      <Printer className="h-4 w-4" /> Print
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" className="gap-1 text-xs">
+                          <Share2 className="h-3.5 w-3.5 text-emerald-600" /> Share
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48 bg-white">
+                        <DropdownMenuItem onClick={() => exportReceipt(t, itemNameMap, settings.companyDetails, "pdf", "share", resolveBranch(t))}>
+                          <FileText className="mr-2 h-4 w-4 text-red-500" /> Share as PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => exportReceipt(t, itemNameMap, settings.companyDetails, "image", "share", resolveBranch(t))}>
+                          <ImageIcon className="mr-2 h-4 w-4 text-blue-500" /> Share as Image
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => exportReceipt(t, itemNameMap, settings.companyDetails, "pdf", "download", resolveBranch(t))}>
+                          <Download className="mr-2 h-4 w-4 text-slate-500" /> Download PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => exportReceipt(t, itemNameMap, settings.companyDetails, "image", "download", resolveBranch(t))}>
+                          <Download className="mr-2 h-4 w-4 text-slate-500" /> Download Image
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => printReceipt(t, itemNameMap, settings.companyDetails, resolveBranch(t))}>
+                      <Printer className="h-3.5 w-3.5" /> Print
                     </Button>
                   </div>
                 </CardContent>
@@ -362,7 +415,7 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
               <TableHead>Customer</TableHead>
               <TableHead className="w-[120px]">Staff</TableHead>
               <TableHead className="w-[100px]">Status</TableHead>
-              <TableHead className="w-[60px]" />
+              <TableHead className="w-[90px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -425,37 +478,63 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                     />
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setReceiptTarget(t)}>
-                          <Eye className="mr-2 h-4 w-4" /> View receipt
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => printReceipt(t, itemNameMap, settings.companyDetails)}>
-                          <Printer className="mr-2 h-4 w-4" /> Print
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          disabled={!onUpdateStatus || r.status === "void" || (updatingReceipt !== null && updatingReceipt !== r.receipt)}
-                          onSelect={async () => {
-                            if (onUpdateStatus) {
-                              try {
-                                setUpdatingReceipt(r.receipt);
-                                await onUpdateStatus(r.receipt, "void");
-                              } finally {
-                                setUpdatingReceipt(null);
+                    <div className="flex items-center justify-end gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Download receipt">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48 bg-white">
+                          <DropdownMenuItem onClick={() => exportReceipt(t, itemNameMap, settings.companyDetails, "pdf", "download", resolveBranch(t))}>
+                            <FileText className="mr-2 h-4 w-4 text-red-500" /> Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => exportReceipt(t, itemNameMap, settings.companyDetails, "image", "download", resolveBranch(t))}>
+                            <ImageIcon className="mr-2 h-4 w-4 text-blue-500" /> Download Image
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52 bg-white">
+                          <DropdownMenuItem onSelect={() => setReceiptTarget(t)}>
+                            <Eye className="mr-2 h-4 w-4" /> View receipt
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => printReceipt(t, itemNameMap, settings.companyDetails, resolveBranch(t))}>
+                            <Printer className="mr-2 h-4 w-4" /> Print
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={() => exportReceipt(t, itemNameMap, settings.companyDetails, "pdf", "share", resolveBranch(t))}>
+                            <FileText className="mr-2 h-4 w-4 text-red-500" /> Share as PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => exportReceipt(t, itemNameMap, settings.companyDetails, "image", "share", resolveBranch(t))}>
+                            <ImageIcon className="mr-2 h-4 w-4 text-blue-500" /> Share as Image
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            disabled={!onUpdateStatus || r.status === "void" || (updatingReceipt !== null && updatingReceipt !== r.receipt)}
+                            onSelect={async () => {
+                              if (onUpdateStatus) {
+                                try {
+                                  setUpdatingReceipt(r.receipt);
+                                  await onUpdateStatus(r.receipt, "void");
+                                } finally {
+                                  setUpdatingReceipt(null);
+                                }
                               }
-                            }
-                          }}
-                        >
-                          <Ban className="mr-2 h-4 w-4" /> Void
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            }}
+                          >
+                            <Ban className="mr-2 h-4 w-4" /> Void
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -494,6 +573,18 @@ function ReceiptDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { settings } = useSettings();
+  const { branches, selectedBranch } = useBranch();
+
+  const resolveBranch = (t: GroupedTransaction) => {
+    const m = t.movements[0];
+    const locId = m?.toLocationId || m?.fromLocationId || m?.toBranchId || m?.fromBranchId;
+    if (locId && branches.length > 0) {
+      const found = branches.find((b) => b.id === locId);
+      if (found) return found;
+    }
+    return selectedBranch;
+  };
+
   const r = transaction ? getReceiptSummary(transaction, itemNameMap) : null;
   const subtotal = r ? r.lineItems.reduce((s, li) => s + li.unitPrice * li.quantity, 0) : 0;
   const totalDiscount = r ? r.lineItems.reduce((s, li) => s + li.discount, 0) : 0;
@@ -578,11 +669,57 @@ function ReceiptDialog({
               </div>
             </div>
 
-            <DialogFooter className="border-t border-border px-6 py-4">
+            <DialogFooter className="border-t border-border px-6 py-4 flex flex-col sm:flex-row gap-2 sm:justify-between items-stretch sm:items-center">
               <Button variant="outline" onClick={() => onOpenChange(false)}>Done</Button>
-              <Button className="gap-1.5" onClick={() => printReceipt(transaction, itemNameMap, settings.companyDetails)}>
-                <Printer className="h-4 w-4" /> Print
-              </Button>
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 text-slate-700 hover:bg-slate-100" title="Quick download receipt">
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48 bg-white">
+                    <DropdownMenuItem onClick={() => exportReceipt(transaction, itemNameMap, settings.companyDetails, "pdf", "download", resolveBranch(transaction))}>
+                      <FileText className="mr-2 h-4 w-4 text-red-500" /> Download PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => exportReceipt(transaction, itemNameMap, settings.companyDetails, "image", "download", resolveBranch(transaction))}>
+                      <ImageIcon className="mr-2 h-4 w-4 text-blue-500" /> Download Image
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-50">
+                      <Share2 className="h-4 w-4 text-emerald-600" />
+                      Share receipt
+                      <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52 bg-white">
+                    <DropdownMenuItem onClick={() => exportReceipt(transaction, itemNameMap, settings.companyDetails, "pdf", "share", resolveBranch(transaction))}>
+                      <FileText className="mr-2 h-4 w-4 text-red-500" /> Share as PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => exportReceipt(transaction, itemNameMap, settings.companyDetails, "image", "share", resolveBranch(transaction))}>
+                      <ImageIcon className="mr-2 h-4 w-4 text-blue-500" /> Share as Image
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => exportReceipt(transaction, itemNameMap, settings.companyDetails, "pdf", "download", resolveBranch(transaction))}>
+                      <Download className="mr-2 h-4 w-4 text-slate-500" /> Download PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => exportReceipt(transaction, itemNameMap, settings.companyDetails, "image", "download", resolveBranch(transaction))}>
+                      <Download className="mr-2 h-4 w-4 text-slate-500" /> Download Image
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => exportReceipt(transaction, itemNameMap, settings.companyDetails, "image", "copy", resolveBranch(transaction))}>
+                      <Copy className="mr-2 h-4 w-4 text-slate-500" /> Copy Image
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button className="gap-1.5" onClick={() => printReceipt(transaction, itemNameMap, settings.companyDetails, resolveBranch(transaction))}>
+                  <Printer className="h-4 w-4" /> Print
+                </Button>
+              </div>
             </DialogFooter>
           </>
         )}

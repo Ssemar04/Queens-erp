@@ -99,6 +99,13 @@ export interface Branch {
   floor?: string;
   roomNumber?: string;
   branchManager?: string;
+  receiptTitle?: string;
+  phone?: string;
+  email?: string;
+  contactLine?: string;
+  receiptSlogan?: string;
+  taxId?: string;
+  receiptVerificationBaseUrl?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

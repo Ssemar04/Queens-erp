@@ -44,7 +44,84 @@ export type EmployeeDraft = Omit<
   systemRole?: UserRoleType;
 };
 
-export const DEPARTMENTS = ["Operations", "Warehouse", "Finance", "Procurement", "Sales", "People", "IT", "Marketing", "Logistics"];
+export const DEFAULT_DEPARTMENTS = ["Sales and Marketing", "Graphics Designer", "Procument", "Administration"];
+export const DEPARTMENTS = DEFAULT_DEPARTMENTS;
+
+const DEPARTMENTS_STORAGE_KEY = "qterp_departments_v1";
+
+export function getStoredDepartments(): string[] {
+  try {
+    const raw = localStorage.getItem(DEPARTMENTS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return DEFAULT_DEPARTMENTS;
+}
+
+export function useDepartments() {
+  const [departments, setDepartments] = useState<string[]>(getStoredDepartments);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DEPARTMENTS_STORAGE_KEY, JSON.stringify(departments));
+    } catch {}
+  }, [departments]);
+
+  const addDepartment = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    let added = false;
+    setDepartments((prev) => {
+      if (prev.some((d) => d.toLowerCase() === trimmed.toLowerCase())) {
+        toast.error("Department already exists");
+        return prev;
+      }
+      toast.success(`Department "${trimmed}" added`);
+      added = true;
+      return [...prev, trimmed];
+    });
+    return added;
+  }, []);
+
+  const editDepartment = useCallback((oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return false;
+    let edited = false;
+    setDepartments((prev) => {
+      if (oldName !== trimmed && prev.some((d) => d.toLowerCase() === trimmed.toLowerCase())) {
+        toast.error("Department with this name already exists");
+        return prev;
+      }
+      toast.success(`Department updated to "${trimmed}"`);
+      edited = true;
+      return prev.map((d) => (d === oldName ? trimmed : d));
+    });
+    return edited;
+  }, []);
+
+  const deleteDepartment = useCallback((name: string) => {
+    setDepartments((prev) => {
+      if (prev.length <= 1) {
+        toast.error("At least one department must remain");
+        return prev;
+      }
+      toast.success(`Department "${name}" removed`);
+      return prev.filter((d) => d !== name);
+    });
+  }, []);
+
+  return {
+    departments,
+    addDepartment,
+    editDepartment,
+    deleteDepartment,
+  };
+}
+
 export const STATUS_LABEL: Record<EmployeeStatus, string> = {
   active: "Active",
   on_leave: "On leave",

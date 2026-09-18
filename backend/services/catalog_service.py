@@ -289,9 +289,11 @@ def create_branch(data):
         """
         INSERT INTO branches (
             id, name, description, street, building, floor, room_number,
-            branch_manager, is_active, created_at, updated_at
+            branch_manager, receipt_title, phone, email, contact_line,
+            receipt_slogan, tax_id, receipt_verification_base_url,
+            is_active, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             data["id"],
@@ -302,6 +304,13 @@ def create_branch(data):
             data.get("floor") or "",
             data.get("roomNumber") or "",
             data.get("branchManager") or "",
+            data.get("receiptTitle") or "",
+            data.get("phone") or "",
+            data.get("email") or "",
+            data.get("contactLine") or "",
+            data.get("receiptSlogan") or "",
+            data.get("taxId") or "",
+            data.get("receiptVerificationBaseUrl") or "",
             int(data.get("isActive", True)),
             created_at,
             updated_at,
@@ -327,6 +336,13 @@ def update_branch(branch_id, data):
         "floor": "floor",
         "roomNumber": "room_number",
         "branchManager": "branch_manager",
+        "receiptTitle": "receipt_title",
+        "phone": "phone",
+        "email": "email",
+        "contactLine": "contact_line",
+        "receiptSlogan": "receipt_slogan",
+        "taxId": "tax_id",
+        "receiptVerificationBaseUrl": "receipt_verification_base_url",
         "isActive": "is_active",
         "updatedAt": "updated_at",
     }

@@ -156,6 +156,31 @@ export function LocationSummary({ branch, items, onEdit }: LocationSummaryProps)
         </div>
       </div>
 
+      {/* Branch Receipt Header Customization Info */}
+      <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+          Receipt Header Customization
+        </h4>
+        <div className="grid gap-2 text-xs sm:grid-cols-2">
+          <div>
+            <span className="text-muted-foreground">Header Title: </span>
+            <span className="font-medium text-foreground">{branch.receiptTitle || branch.name}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Contact Line: </span>
+            <span className="font-medium text-foreground">{branch.contactLine || branch.phone || "Company default"}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Tax / TIN ID: </span>
+            <span className="font-medium text-foreground">{branch.taxId || "Company default"}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Receipt Slogan: </span>
+            <span className="font-medium text-foreground">{branch.receiptSlogan || "Company default"}</span>
+          </div>
+        </div>
+      </div>
+
       {locationItems.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
           No items are currently assigned to this branch

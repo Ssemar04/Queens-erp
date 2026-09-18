@@ -3,7 +3,7 @@ import uuid
 import json
 from datetime import datetime, timezone
 
-from services.database import get_central_db as get_db
+from services.database import get_central_db as get_db, get_branch_db
 from services.chat_service import ensure_chat_user_for_account, remove_chat_user
 
 
@@ -64,6 +64,11 @@ def create_employee(emp_data):
     code = emp_data.get("code") or next_employee_code()
     skills = json.dumps(emp_data.get("skills", []))
     branch_id = resolve_branch_id(db, emp_data.get("branchId") or emp_data.get("branch_id"), emp_data.get("location"))
+    # Pre-initialize sub-database schema for the employee's assigned branch
+    try:
+        get_branch_db(branch_id)
+    except Exception:
+        pass
 
     db.execute(
         """
@@ -166,6 +171,12 @@ def reset_employee_credentials(emp_id):
     email = emp["email"]
     name = emp["name"]
     account_role = normalize_account_role(emp["role"])
+    emp_branch_id = emp["branch_id"] if "branch_id" in emp.keys() else None
+    branch_id = resolve_branch_id(db, emp_branch_id, emp["location"])
+    try:
+        get_branch_db(branch_id)
+    except Exception:
+        pass
 
     existing_user = db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
     if existing_user:
@@ -173,19 +184,19 @@ def reset_employee_credentials(emp_id):
             """
             UPDATE users
             SET password_hash = ?, name = ?, role = COALESCE(role, ?), is_active = 1,
-                must_change_password = 1, one_time_password = ?
+                must_change_password = 1, one_time_password = ?, branch_id = ?
             WHERE id = ?
             """,
-            (password_hash, name, account_role, otp, existing_user["id"])
+            (password_hash, name, account_role, otp, branch_id, existing_user["id"])
         )
         user_id = existing_user["id"]
     else:
         cursor = db.execute(
             """
-            INSERT INTO users (email, password_hash, name, role, is_active, must_change_password, one_time_password)
-            VALUES (?, ?, ?, ?, 1, 1, ?)
+            INSERT INTO users (email, password_hash, name, role, is_active, must_change_password, one_time_password, branch_id)
+            VALUES (?, ?, ?, ?, 1, 1, ?, ?)
             """,
-            (email, password_hash, name, account_role, otp)
+            (email, password_hash, name, account_role, otp, branch_id)
         )
         user_id = cursor.lastrowid
 
@@ -217,6 +228,10 @@ def update_employee_account(emp_id, account_data):
     is_active = 1 if account_data.get("isActive", True) else 0
     emp_branch_id = emp["branch_id"] if "branch_id" in emp.keys() else None
     branch_id = resolve_branch_id(db, account_data.get("branchId") or account_data.get("branch_id") or emp_branch_id, emp["location"])
+    try:
+        get_branch_db(branch_id)
+    except Exception:
+        pass
 
     email_conflict = db.execute(
         """
@@ -332,6 +347,10 @@ def update_employee(emp_id, emp_data):
     if original and updated:
         account_role = normalize_account_role(emp_data.get("systemRole") or updated["role"])
         new_branch_id = resolve_branch_id(db, emp_data.get("branchId") or emp_data.get("branch_id"), updated["location"])
+        try:
+            get_branch_db(new_branch_id)
+        except Exception:
+            pass
         user = db.execute(
             "SELECT id FROM users WHERE email = ?",
             (original["email"],),

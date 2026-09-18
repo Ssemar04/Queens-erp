@@ -13,7 +13,7 @@ import type {
   EmployeeStatus,
   EmploymentType,
 } from "./employees-store";
-import { DEPARTMENTS } from "./employees-store";
+import { useDepartments } from "./employees-store";
 import { useBranch } from "@/contexts/BranchContext";
 import { SYSTEM_ROLES, getRoleInfo, type UserRoleType } from "@/lib/roles";
 
@@ -25,13 +25,14 @@ interface Props {
 }
 
 const EMPTY: EmployeeDraft = {
-  name: "", email: "", phone: "", role: "Staff", department: "Operations", location: "", branchId: "",
+  name: "", email: "", phone: "", role: "Staff", department: "Sales and Marketing", location: "", branchId: "",
   employmentType: "full_time", status: "active", joinedAt: new Date().toISOString().slice(0, 10),
   salary: 0, skills: [], manager: "", bio: "",
 };
 
 export function EmployeeFormSheet({ open, onOpenChange, initial, onSave }: Props) {
   const { branches } = useBranch();
+  const { departments } = useDepartments();
   const [f, setF] = useState<EmployeeDraft | Employee>(EMPTY);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -191,7 +192,7 @@ export function EmployeeFormSheet({ open, onOpenChange, initial, onSave }: Props
             <Label>Department</Label>
             <Select value={f.department} onValueChange={(v) => setF({ ...f, department: v })}>
               <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
-              <SelectContent>{DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              <SelectContent>{departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
             </Select>
           </div>
 

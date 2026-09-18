@@ -203,6 +203,13 @@ BRANCH_COLUMN_MIGRATIONS = [
     ("floor", "TEXT NOT NULL DEFAULT ''"),
     ("room_number", "TEXT NOT NULL DEFAULT ''"),
     ("branch_manager", "TEXT NOT NULL DEFAULT ''"),
+    ("receipt_title", "TEXT NOT NULL DEFAULT ''"),
+    ("phone", "TEXT NOT NULL DEFAULT ''"),
+    ("email", "TEXT NOT NULL DEFAULT ''"),
+    ("contact_line", "TEXT NOT NULL DEFAULT ''"),
+    ("receipt_slogan", "TEXT NOT NULL DEFAULT ''"),
+    ("tax_id", "TEXT NOT NULL DEFAULT ''"),
+    ("receipt_verification_base_url", "TEXT NOT NULL DEFAULT ''"),
 ]
 
 

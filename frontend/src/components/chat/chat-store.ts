@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, type ReactNode, createElement, useCallback } from "react";
-import { getChatUsers, getChatChannels, getChannelMessages, createChatMessage, updateChatMessage, deleteChatMessage, createChatChannel, startDirectMessage, updateChatChannel, deleteChatChannel, addChannelMember, removeChannelMember, heartbeatPresence, setPresenceOffline, setTyping, getTypingInChannel, markChannelRead, getUnreadCounts, getChannelMembers, getChatEmployees, type TypingState, type ReadReceipt, type EnrichedChatMember } from "@/services/api";
+import { getChatUsers, getChatChannels, getChannelMessages, createChatMessage, updateChatMessage, deleteChatMessage, createChatChannel, startDirectMessage, updateChatChannel, deleteChatChannel, addChannelMember, removeChannelMember, heartbeatPresence, setPresenceOffline, setTyping, getTypingInChannel, markChannelRead, getUnreadCounts, getChannelMembers, getChatEmployees, checkChatAccess, type TypingState, type ReadReceipt, type EnrichedChatMember } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 
 export interface ChatUser {
@@ -113,7 +113,6 @@ function useChatStore(): Ctx {
     let cancelled = false;
     (async () => {
       try {
-        const { checkChatAccess } = await import("@/services/api");
         const res = await checkChatAccess();
         if (cancelled) return;
         if (res.allowed) {
