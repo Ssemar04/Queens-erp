@@ -70,20 +70,23 @@ def create_employee(emp_data):
     except Exception:
         pass
 
+    allowed_pages_val = emp_data.get("allowedPages") if "allowedPages" in emp_data else emp_data.get("allowed_pages")
+    allowed_pages_str = json.dumps(allowed_pages_val) if isinstance(allowed_pages_val, list) else None
+
     db.execute(
         """
         INSERT INTO employees (
             id, code, name, email, phone, avatar, role, department, manager,
             location, branch_id, employment_type, status, joined_at, salary, skills,
-            emergency_contact, bio, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            emergency_contact, bio, allowed_pages, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             emp_id, code, emp_data["name"], emp_data["email"], emp_data["phone"],
             emp_data.get("avatar"), emp_data["role"], emp_data["department"],
             emp_data.get("manager"), emp_data["location"], branch_id, emp_data["employmentType"],
             emp_data["status"], emp_data["joinedAt"], emp_data["salary"], skills,
-            emp_data.get("emergencyContact"), emp_data.get("bio"),
+            emp_data.get("emergencyContact"), emp_data.get("bio"), allowed_pages_str,
             emp_data.get("createdAt") or now, emp_data.get("updatedAt") or now
         )
     )
@@ -101,19 +104,19 @@ def create_employee(emp_data):
             """
             UPDATE users
             SET password_hash = ?, name = ?, role = ?, is_active = 1,
-                must_change_password = 1, one_time_password = ?, branch_id = ?
+                must_change_password = 1, one_time_password = ?, branch_id = ?, allowed_pages = ?
             WHERE id = ?
             """,
-            (password_hash, name, account_role, otp, branch_id, existing_user["id"])
+            (password_hash, name, account_role, otp, branch_id, allowed_pages_str, existing_user["id"])
         )
         user_id = existing_user["id"]
     else:
         cursor = db.execute(
             """
-            INSERT INTO users (email, password_hash, name, role, is_active, must_change_password, one_time_password, branch_id)
-            VALUES (?, ?, ?, ?, 1, 1, ?, ?)
+            INSERT INTO users (email, password_hash, name, role, is_active, must_change_password, one_time_password, branch_id, allowed_pages)
+            VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?)
             """,
-            (email, password_hash, name, account_role, otp, branch_id)
+            (email, password_hash, name, account_role, otp, branch_id, allowed_pages_str)
         )
         user_id = cursor.lastrowid
 
@@ -315,6 +318,8 @@ def update_employee(emp_id, emp_data):
         "joinedAt": "joined_at",
         "salary": "salary",
         "skills": "skills",
+        "allowedPages": "allowed_pages",
+        "allowed_pages": "allowed_pages",
         "emergencyContact": "emergency_contact",
         "bio": "bio"
     }
@@ -322,7 +327,7 @@ def update_employee(emp_id, emp_data):
     for frontend_field, db_field in allowed_fields.items():
         if frontend_field in emp_data:
             value = emp_data[frontend_field]
-            if frontend_field == "skills":
+            if frontend_field in ("skills", "allowedPages", "allowed_pages") and isinstance(value, (list, dict)):
                 value = json.dumps(value)
             updates.append(f"{db_field} = ?")
             params.append(value)
@@ -347,6 +352,7 @@ def update_employee(emp_id, emp_data):
     if original and updated:
         account_role = normalize_account_role(emp_data.get("systemRole") or updated["role"])
         new_branch_id = resolve_branch_id(db, emp_data.get("branchId") or emp_data.get("branch_id"), updated["location"])
+        allowed_pages_str = json.dumps(emp_data["allowedPages"]) if "allowedPages" in emp_data and isinstance(emp_data["allowedPages"], list) else (updated["allowed_pages"] if "allowed_pages" in updated.keys() else None)
         try:
             get_branch_db(new_branch_id)
         except Exception:
@@ -358,10 +364,10 @@ def update_employee(emp_id, emp_data):
         db.execute(
             """
             UPDATE users
-            SET email = ?, name = ?, role = ?, branch_id = ?
+            SET email = ?, name = ?, role = ?, branch_id = ?, allowed_pages = ?
             WHERE email = ?
             """,
-            (updated["email"], updated["name"], account_role, new_branch_id, original["email"]),
+            (updated["email"], updated["name"], account_role, new_branch_id, allowed_pages_str, original["email"]),
         )
         if user:
             ensure_chat_user_for_account({"id": user["id"], "name": updated["name"], "role": account_role}, db=db)

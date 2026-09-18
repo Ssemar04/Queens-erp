@@ -31,6 +31,7 @@ export interface Employee {
   joinedAt: string;
   salary: number;
   skills: string[];
+  allowedPages?: string[];
   emergencyContact?: string;
   bio?: string;
   createdAt: string;

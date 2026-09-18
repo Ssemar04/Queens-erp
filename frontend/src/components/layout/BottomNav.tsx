@@ -5,6 +5,9 @@ import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "./Sidebar";
 
+import { useRole } from "@/hooks/useRole";
+import { canAccessRoute } from "@/lib/route-guard";
+
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
   { label: "Inventory", href: "/app/catalog", icon: Package },
@@ -15,8 +18,11 @@ const NAV_ITEMS = [
 export function BottomNav() {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { role, allowedPages } = useRole();
 
   const isActive = (href: string) => location.pathname === href;
+
+  const visibleItems = NAV_ITEMS.filter((item) => canAccessRoute(item.href, role, allowedPages));
 
   return (
     <>
@@ -27,7 +33,7 @@ export function BottomNav() {
           paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >
-        {NAV_ITEMS.map((item) => (
+        {visibleItems.map((item) => (
           <Link
             key={item.href}
             to={item.href}

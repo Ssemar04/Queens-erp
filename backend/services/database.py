@@ -242,6 +242,7 @@ def ensure_user_account_columns(db):
             ("must_change_password", "INTEGER NOT NULL DEFAULT 0"),
             ("one_time_password", "TEXT"),
             ("branch_id", "TEXT"),
+            ("allowed_pages", "TEXT"),
         ],
     )
     add_missing_columns(
@@ -249,6 +250,7 @@ def ensure_user_account_columns(db):
         "employees",
         [
             ("branch_id", "TEXT"),
+            ("allowed_pages", "TEXT"),
         ],
     )
 

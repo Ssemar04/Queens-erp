@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export interface RoleContextValue {
   role: UserRoleType;
+  allowedPages?: string[] | null;
   permissions: RolePermissions;
   isAdmin: boolean;
   isManager: boolean;
@@ -18,12 +19,16 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth();
   const sessionRole = user?.user_metadata?.role as UserRoleType | undefined;
   const role = isAuthenticated && sessionRole ? sessionRole : "staff";
+  const userExtra = user as (typeof user & { allowedPages?: string[] | null; allowed_pages?: string[] | null }) | null;
+  const allowedPages = userExtra?.allowedPages || userExtra?.allowed_pages || null;
+
   const ignoreLocalRoleChange = useCallback((_role: UserRoleType) => {}, []);
 
   const value = useMemo<RoleContextValue>(() => {
     const permissions = getPermissionsForRole(role);
     return {
       role,
+      allowedPages,
       permissions,
       isAdmin: role === "admin",
       isManager: role === "manager",
@@ -31,7 +36,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       setRole: ignoreLocalRoleChange,
       setDemoRole: ignoreLocalRoleChange,
     };
-  }, [ignoreLocalRoleChange, role]);
+  }, [allowedPages, ignoreLocalRoleChange, role]);
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 }

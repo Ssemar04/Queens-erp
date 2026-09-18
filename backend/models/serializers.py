@@ -9,6 +9,16 @@ def serialize_user(user):
         except (KeyError, IndexError):
             return default
 
+    raw_pages = get("allowed_pages")
+    allowed_pages = None
+    if raw_pages:
+        try:
+            parsed = json.loads(raw_pages)
+            if isinstance(parsed, list):
+                allowed_pages = parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return {
         "id": str(user["id"]),
         "name": user["name"],
@@ -17,6 +27,7 @@ def serialize_user(user):
         "isActive": bool(get("is_active", 1)),
         "mustChangePassword": bool(get("must_change_password", 0)),
         "branchId": get("branch_id"),
+        "allowedPages": allowed_pages,
         "chatUserId": str(user["id"]),
     }
 
@@ -589,6 +600,12 @@ def employee_from_row(row):
     except (json.JSONDecodeError, TypeError, KeyError):
         skills = []
 
+    try:
+        raw_allowed = get("allowed_pages")
+        allowed_pages = json.loads(raw_allowed) if raw_allowed else None
+    except (json.JSONDecodeError, TypeError, KeyError):
+        allowed_pages = None
+
     return {
         "id": row["id"],
         "code": row["code"],
@@ -606,6 +623,7 @@ def employee_from_row(row):
         "joinedAt": row["joined_at"],
         "salary": row["salary"],
         "skills": skills if isinstance(skills, list) else [],
+        "allowedPages": allowed_pages if isinstance(allowed_pages, list) else None,
         "emergencyContact": get("emergency_contact"),
         "bio": get("bio"),
         "createdAt": row["created_at"],

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Search, Users, UserCheck, UserMinus, MapPin, LayoutGrid, List as ListIcon, Mail, Phone, Trash2, Building2 } from "lucide-react";
+import { Plus, Search, Users, UserCheck, UserMinus, MapPin, LayoutGrid, List as ListIcon, Mail, Phone, Trash2, Building2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ import { EmployeeFormSheet } from "@/components/employees/EmployeeFormSheet";
 import { EmployeeDetailSheet } from "@/components/employees/EmployeeDetailSheet";
 import { OneTimeCredentialsModal } from "@/components/employees/OneTimeCredentialsModal";
 import { DepartmentManagerModal } from "@/components/employees/DepartmentManagerModal";
+import { PageAccessModal } from "@/components/employees/PageAccessModal";
 import type { EmployeeOneTimeCredentials } from "@/services/api";
 
 import { useBranch } from "@/contexts/BranchContext";
@@ -59,6 +60,15 @@ function EmployeesPage() {
   const [credModalOpen, setCredModalOpen] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<EmployeeOneTimeCredentials | null>(null);
   const [createdEmpName, setCreatedEmpName] = useState("");
+
+  // Page Access Modal State
+  const [pageAccessModalOpen, setPageAccessModalOpen] = useState(false);
+  const [pageAccessEmp, setPageAccessEmp] = useState<Employee | null>(null);
+
+  async function handleSavePageAccess(employeeId: string, allowedPages: string[]) {
+    await update(employeeId, { allowedPages });
+    toast.success("Page access permissions updated");
+  }
 
   const branches = useMemo(() => {
     const set = new Set<string>();
@@ -207,8 +217,22 @@ function EmployeesPage() {
                       <p className="flex items-center gap-1.5 truncate"><Mail className="h-3 w-3" />{e.email}</p>
                       <p className="flex items-center gap-1.5 truncate"><Phone className="h-3 w-3" />{e.phone}</p>
                     </div>
-                    <div className="mt-3 flex items-center justify-between">
+                    <div className="mt-3 flex items-center justify-between gap-1 flex-wrap">
                       <Badge variant="outline" className="font-mono text-[10px]">{e.code}</Badge>
+                      {isAdmin && (
+                        <Badge
+                          variant="outline"
+                          onClick={(evt) => {
+                            evt.stopPropagation();
+                            setPageAccessEmp(e);
+                            setPageAccessModalOpen(true);
+                          }}
+                          className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 cursor-pointer hover:bg-emerald-100 flex items-center gap-1"
+                          title="Click to manage page access"
+                        >
+                          <ShieldCheck className="h-3 w-3" /> {e.allowedPages ? e.allowedPages.length : 17} Pages
+                        </Badge>
+                      )}
                       <Badge className={STATUS_CLS[e.status]}>{STATUS_LABEL[e.status]}</Badge>
                     </div>
                   </button>
@@ -225,10 +249,11 @@ function EmployeesPage() {
                 <TableHead>Employee</TableHead>
                 <TableHead>Branch / Location</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Page Access</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Salary</TableHead>
-                <TableHead className="w-12 text-center">Actions</TableHead>
+                <TableHead className="w-20 text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -247,19 +272,53 @@ function EmployeesPage() {
                     </span>
                   </TableCell>
                   <TableCell>{e.role}</TableCell>
+                  <TableCell>
+                    {isAdmin ? (
+                      <Badge
+                        variant="outline"
+                        onClick={(evt) => {
+                          evt.stopPropagation();
+                          setPageAccessEmp(e);
+                          setPageAccessModalOpen(true);
+                        }}
+                        className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 cursor-pointer hover:bg-emerald-100 flex items-center gap-1"
+                        title="Click to manage page access"
+                      >
+                        <ShieldCheck className="h-3 w-3" /> {e.allowedPages ? e.allowedPages.length : 17} Pages Permitted
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground font-mono">{e.allowedPages ? e.allowedPages.length : 17} Pages</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{e.department}</TableCell>
                   <TableCell><Badge className={STATUS_CLS[e.status]}>{STATUS_LABEL[e.status]}</Badge></TableCell>
                   <TableCell className="text-right font-mono">{e.salary.toLocaleString()}</TableCell>
                   <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(e)}
-                      title="Delete employee"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-center gap-1">
+                      {isAdmin && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          onClick={() => {
+                            setPageAccessEmp(e);
+                            setPageAccessModalOpen(true);
+                          }}
+                          title="Manage Page Access"
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(e)}
+                        title="Delete employee"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -292,6 +351,12 @@ function EmployeesPage() {
         onAdd={addDepartment}
         onEdit={editDepartment}
         onDelete={deleteDepartment}
+      />
+      <PageAccessModal
+        open={pageAccessModalOpen}
+        onOpenChange={setPageAccessModalOpen}
+        employee={pageAccessEmp}
+        onSave={handleSavePageAccess}
       />
     </div>
   );

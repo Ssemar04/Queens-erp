@@ -97,7 +97,7 @@ interface SidebarProps {
 export function Sidebar({ onNavigate }: SidebarProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const { role } = useRole();
+  const { role, allowedPages } = useRole();
 
   const toggleGroup = (label: string) => {
     setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -108,11 +108,11 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const visibleGroups = navGroups
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) => canAccessRoute(i.href, role)),
+      items: g.items.filter((i) => canAccessRoute(i.href, role, allowedPages)),
     }))
     .filter((g) => g.items.length > 0);
 
-  const visibleStandalone = standaloneLinks.filter((i) => canAccessRoute(i.href, role));
+  const visibleStandalone = standaloneLinks.filter((i) => canAccessRoute(i.href, role, allowedPages));
 
   return (
     <nav data-tour="sidebar" className="flex h-full flex-col bg-sidebar text-sidebar-foreground">

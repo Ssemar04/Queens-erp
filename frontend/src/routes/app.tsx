@@ -20,7 +20,7 @@ export const Route = createFileRoute("/app")({
 });
 
 function AppLayout() {
-  const { role } = useRole();
+  const { role, allowedPages } = useRole();
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,11 +37,11 @@ function AppLayout() {
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
-    if (!canAccessRoute(location.pathname, role)) {
+    if (!canAccessRoute(location.pathname, role, allowedPages)) {
       toast.error("You don't have permission to access that page.");
       navigate({ to: "/app/dashboard" });
     }
-  }, [isAuthenticated, isLoading, location.pathname, role, navigate]);
+  }, [allowedPages, isAuthenticated, isLoading, location.pathname, role, navigate]);
 
   if (isLoading || !isAuthenticated) {
     return (
