@@ -58,7 +58,9 @@ export function getStoredDepartments(): string[] {
         return parsed;
       }
     }
-  } catch {}
+  } catch (_err) {
+    // Ignore storage errors
+  }
   return DEFAULT_DEPARTMENTS;
 }
 
@@ -68,7 +70,9 @@ export function useDepartments() {
   useEffect(() => {
     try {
       localStorage.setItem(DEPARTMENTS_STORAGE_KEY, JSON.stringify(departments));
-    } catch {}
+    } catch (_err) {
+    // Ignore storage errors
+  }
   }, [departments]);
 
   const addDepartment = useCallback((name: string) => {
