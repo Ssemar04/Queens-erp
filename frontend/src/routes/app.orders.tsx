@@ -16,6 +16,7 @@ import {
   Upload,
   Eye,
   X,
+  ShoppingCart,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -49,8 +50,10 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
-import { createOrder, deleteOrder, getEmployees, getOrders, updateOrder } from "@/services/api";
-import type { OrderStatus, QuotationAttachment, SalesOrder } from "@/types/sales-order";
+import { createOrder, deleteOrder, getCustomers, getEmployees, getItems, getOrders, updateOrder } from "@/services/api";
+import type { Customer } from "@/services/api";
+import type { Item } from "@/types/inventory";
+import type { OrderItem, OrderStatus, QuotationAttachment, SalesOrder } from "@/types/sales-order";
 import type { Employee } from "@/components/employees/employees-store";
 
 export const Route = createFileRoute("/app/orders")({
@@ -79,6 +82,8 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 function OrdersPage() {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<Item[]>([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
@@ -88,12 +93,16 @@ function OrdersPage() {
   const loadDatabaseOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const [fetchedOrders, fetchedEmployees] = await Promise.all([
+      const [fetchedOrders, fetchedEmployees, fetchedCustomers, fetchedItems] = await Promise.all([
         getOrders(),
         getEmployees().catch(() => []),
+        getCustomers().catch(() => []),
+        getItems().catch(() => []),
       ]);
       setOrders(fetchedOrders);
       setEmployees(fetchedEmployees);
+      setCustomers(fetchedCustomers);
+      setInventoryItems(fetchedItems);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load orders";
       toast.error(message);
@@ -390,6 +399,8 @@ function OrdersPage() {
         onCreate={handleCreate}
         submitting={saving}
         employees={employees}
+        customers={customers}
+        inventoryItems={inventoryItems}
       />
     </div>
   );
@@ -426,6 +437,8 @@ function OrderFormSheet({
   onCreate,
   submitting,
   employees,
+  customers,
+  inventoryItems,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -433,15 +446,20 @@ function OrderFormSheet({
   onCreate: (o: SalesOrder) => void;
   submitting: boolean;
   employees: Employee[];
+  customers: Customer[];
+  inventoryItems: Item[];
 }) {
   const [lpoNumber, setLpo] = useState(nextLpo);
   const [dateReceived, setDateReceived] = useState(todayISO());
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
   const [customerQuotation, setCustomerQuotation] = useState("");
   const [quotationAttachment, setQuotationAttachment] = useState<QuotationAttachment | null>(null);
+  const [cartItems, setCartItems] = useState<OrderItem[]>([
+    { id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 },
+  ]);
   const [dateToBeDelivered, setDelivery] = useState("");
   const [handledBy, setHandledBy] = useState("");
-  const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -449,15 +467,20 @@ function OrderFormSheet({
     if (open) {
       setLpo(nextLpo);
       setDateReceived(todayISO());
+      setSelectedCustomerId("");
       setCustomerName("");
       setCustomerQuotation("");
       setQuotationAttachment(null);
+      setCartItems([{ id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 }]);
       setDelivery("");
       setHandledBy(employees[0]?.name || "");
-      setAmount("");
       setNotes("");
     }
   }, [open, nextLpo, employees]);
+
+  const grandTotal = useMemo(() => {
+    return cartItems.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
+  }, [cartItems]);
 
   const valid =
     lpoNumber.trim() && dateReceived && customerName.trim() && dateToBeDelivered && handledBy.trim();
@@ -480,19 +503,80 @@ function OrderFormSheet({
     reader.readAsDataURL(file);
   }
 
+  function handleAddItem() {
+    setCartItems((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 },
+    ]);
+  }
+
+  function handleRemoveItem(id: string) {
+    setCartItems((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      return next.length > 0
+        ? next
+        : [{ id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 }];
+    });
+  }
+
+  function handleItemChange(id: string, field: keyof OrderItem, val: any) {
+    setCartItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const updated = { ...item, [field]: val };
+        if (field === "quantity" || field === "unitPrice") {
+          const q = field === "quantity" ? Number(val) || 0 : Number(item.quantity) || 0;
+          const p = field === "unitPrice" ? Number(val) || 0 : Number(item.unitPrice) || 0;
+          updated.total = q * p;
+        }
+        return updated;
+      })
+    );
+  }
+
+  function handleSelectInventoryItem(id: string, itemId: string) {
+    const found = inventoryItems.find((i) => i.id === itemId);
+    if (!found) return;
+    setCartItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const qty = Number(item.quantity) || 1;
+        const price = Number(found.sellingPrice) || 0;
+        return {
+          ...item,
+          itemId: found.id,
+          name: found.name,
+          unitPrice: price,
+          total: qty * price,
+        };
+      })
+    );
+  }
+
   function submit() {
     if (!valid) return;
+    const cleanItems = cartItems
+      .filter((i) => i.name.trim() !== "")
+      .map((i) => ({
+        ...i,
+        quantity: Number(i.quantity) || 0,
+        unitPrice: Number(i.unitPrice) || 0,
+        total: (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0),
+      }));
+
     onCreate({
       id: crypto.randomUUID(),
       lpoNumber: lpoNumber.trim(),
       dateReceived,
       customerName: customerName.trim(),
+      customerId: selectedCustomerId || undefined,
       customerQuotation: customerQuotation.trim() || "—",
       quotationAttachment,
       dateToBeDelivered,
       handledBy: handledBy.trim(),
       status: "confirmed",
-      amount: parseFloat(amount) || 0,
+      amount: grandTotal,
+      items: cleanItems.length > 0 ? cleanItems : undefined,
       notes: notes.trim() || undefined,
       createdAt: new Date().toISOString(),
     });
@@ -500,7 +584,7 @@ function OrderFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-[560px] overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-[580px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>New sales order</SheetTitle>
           <SheetDescription>Register a Local Purchase Order received from a customer.</SheetDescription>
@@ -517,11 +601,53 @@ function OrderFormSheet({
           </div>
 
           <Field label="Customer name" icon={User}>
-            <Input
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="e.g. Acme Holdings Ltd"
-            />
+            <div className="space-y-2">
+              <Select
+                value={selectedCustomerId || "custom"}
+                onValueChange={(val) => {
+                  if (val === "custom") {
+                    setSelectedCustomerId("");
+                  } else {
+                    const found = customers.find((c) => c.id === val);
+                    if (found) {
+                      setSelectedCustomerId(found.id);
+                      setCustomerName(found.name);
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full bg-white">
+                  <SelectValue placeholder="Select from customers database..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom" className="font-medium text-muted-foreground">
+                    Custom customer name
+                  </SelectItem>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span>{c.name}</span>
+                        <span className="text-xs text-muted-foreground">({c.reference})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                value={customerName}
+                onChange={(e) => {
+                  setCustomerName(e.target.value);
+                  if (selectedCustomerId) {
+                    const matched = customers.find((c) => c.id === selectedCustomerId);
+                    if (matched && matched.name !== e.target.value) {
+                      setSelectedCustomerId("");
+                    }
+                  }
+                }}
+                placeholder="Customer name (or type custom name)..."
+                className="bg-white"
+              />
+            </div>
           </Field>
 
           <Field label="Customer quotation details" icon={FileText}>
@@ -529,7 +655,7 @@ function OrderFormSheet({
               value={customerQuotation}
               onChange={(e) => setCustomerQuotation(e.target.value)}
               placeholder={"QT-0000 · Scope, line items, validity, payment terms…"}
-              rows={4}
+              rows={3}
             />
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <input
@@ -558,6 +684,128 @@ function OrderFormSheet({
             </div>
           </Field>
 
+          {/* Cart Format - Multi Item List */}
+          <div className="rounded-xl border border-border bg-slate-50/50 p-3 space-y-3 dark:bg-slate-900/40">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <ShoppingCart className="h-3.5 w-3.5 text-primary" />
+                Order Line Items (Cart)
+              </Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleAddItem}
+                className="h-7 px-2 text-xs gap-1"
+              >
+                <Plus className="h-3 w-3" />
+                Add item
+              </Button>
+            </div>
+
+            <div className="space-y-2.5">
+              {cartItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="rounded-lg border border-border bg-white p-2.5 space-y-2 shadow-sm dark:bg-slate-950"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      Item #{index + 1}
+                    </span>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleRemoveItem(item.id)}
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+
+                  {inventoryItems.length > 0 && (
+                    <Select
+                      value={item.itemId || "custom"}
+                      onValueChange={(v) => {
+                        if (v === "custom") {
+                          handleItemChange(item.id, "itemId", undefined);
+                        } else {
+                          handleSelectInventoryItem(item.id, v);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs bg-white">
+                        <SelectValue placeholder="Select product from inventory..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="custom" className="font-medium text-muted-foreground">
+                          Custom Item / Service
+                        </SelectItem>
+                        {inventoryItems.map((inv) => (
+                          <SelectItem key={inv.id} value={inv.id}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate">{inv.name}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                (UGX {inv.sellingPrice.toLocaleString()})
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  <Input
+                    value={item.name}
+                    onChange={(e) => handleItemChange(item.id, "name", e.target.value)}
+                    placeholder="Item name or description"
+                    className="h-8 text-xs"
+                  />
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Units (Qty)</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)}
+                        className="h-8 text-xs font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Price (UGX)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={item.unitPrice}
+                        onChange={(e) => handleItemChange(item.id, "unitPrice", e.target.value)}
+                        className="h-8 text-xs font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Total (UGX)</Label>
+                      <div className="h-8 flex items-center px-2.5 rounded-md border border-border bg-muted/40 font-mono text-xs font-medium text-foreground truncate">
+                        {((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Grand Total Footer */}
+            <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+              <span>Grand Amount</span>
+              <span className="font-mono text-base font-bold">
+                UGX {grandTotal.toLocaleString()}
+              </span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Delivery date" icon={Truck}>
               <Input type="date" value={dateToBeDelivered} onChange={(e) => setDelivery(e.target.value)} />
@@ -583,17 +831,6 @@ function OrderFormSheet({
               </Select>
             </Field>
           </div>
-
-          <Field label="Amount (UGX)" icon={FileText}>
-            <Input
-              type="number"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="font-mono"
-            />
-          </Field>
 
           <div>
             <Label className="text-xs font-medium text-muted-foreground">Notes</Label>

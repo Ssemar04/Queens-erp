@@ -7,6 +7,15 @@ export interface QuotationAttachment {
   size: number;
 }
 
+export interface OrderItem {
+  id: string;
+  itemId?: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
 export interface SalesOrder {
   id: string;
   lpoNumber: string;
@@ -20,6 +29,7 @@ export interface SalesOrder {
   employeeId?: string;
   status: OrderStatus;
   amount: number;
+  items?: OrderItem[];
   notes?: string | null;
   createdAt: string;
   updatedAt?: string;
