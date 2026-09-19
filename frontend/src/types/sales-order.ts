@@ -22,7 +22,7 @@ export interface SalesOrder {
   dateReceived: string;
   customerName: string;
   customerId?: string;
-  customerQuotation: string;
+  customerQuotation?: string;
   quotationAttachment?: QuotationAttachment | null;
   dateToBeDelivered: string;
   handledBy: string;

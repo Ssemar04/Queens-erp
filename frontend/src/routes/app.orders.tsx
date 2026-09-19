@@ -131,7 +131,7 @@ function OrdersPage() {
       return (
         o.lpoNumber.toLowerCase().includes(q) ||
         o.customerName.toLowerCase().includes(q) ||
-        o.customerQuotation.toLowerCase().includes(q) ||
+        (o.customerQuotation ? o.customerQuotation.toLowerCase().includes(q) : false) ||
         o.handledBy.toLowerCase().includes(q)
       );
     });
@@ -269,7 +269,7 @@ function OrdersPage() {
                 <TableHead>LPO #</TableHead>
                 <TableHead>Date received</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Quotation</TableHead>
+                <TableHead>Items</TableHead>
                 <TableHead>Delivery date</TableHead>
                 <TableHead>Handled by</TableHead>
                 <TableHead>Amount</TableHead>
@@ -295,21 +295,19 @@ function OrdersPage() {
                       </span>
                     </TableCell>
                     <TableCell className="font-medium">{o.customerName}</TableCell>
-                    <TableCell className="max-w-[280px]">
-                      <div className="space-y-1">
+                    <TableCell className="max-w-[260px]">
+                      {o.items && o.items.length > 0 ? (
+                        <div className="space-y-0.5">
+                          <p className="line-clamp-2 text-xs font-medium text-foreground">
+                            {o.items.map((i) => `${i.name} (x${i.quantity})`).join(", ")}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">{o.items.length} line item{o.items.length > 1 ? "s" : ""}</p>
+                        </div>
+                      ) : o.customerQuotation ? (
                         <p className="line-clamp-2 text-xs text-muted-foreground">{o.customerQuotation}</p>
-                        {o.quotationAttachment && (
-                          <a
-                            href={o.quotationAttachment.dataUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-muted"
-                          >
-                            <Paperclip className="h-3 w-3" />
-                            {o.quotationAttachment.name}
-                          </a>
-                        )}
-                      </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span
@@ -453,7 +451,6 @@ function OrderFormSheet({
   const [dateReceived, setDateReceived] = useState(todayISO());
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
-  const [customerQuotation, setCustomerQuotation] = useState("");
   const [quotationAttachment, setQuotationAttachment] = useState<QuotationAttachment | null>(null);
   const [cartItems, setCartItems] = useState<OrderItem[]>([
     { id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 },
@@ -469,7 +466,6 @@ function OrderFormSheet({
       setDateReceived(todayISO());
       setSelectedCustomerId("");
       setCustomerName("");
-      setCustomerQuotation("");
       setQuotationAttachment(null);
       setCartItems([{ id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 }]);
       setDelivery("");
@@ -570,7 +566,6 @@ function OrderFormSheet({
       dateReceived,
       customerName: customerName.trim(),
       customerId: selectedCustomerId || undefined,
-      customerQuotation: customerQuotation.trim() || "—",
       quotationAttachment,
       dateToBeDelivered,
       handledBy: handledBy.trim(),
@@ -647,40 +642,6 @@ function OrderFormSheet({
                 placeholder="Customer name (or type custom name)..."
                 className="bg-white"
               />
-            </div>
-          </Field>
-
-          <Field label="Customer quotation details" icon={FileText}>
-            <Textarea
-              value={customerQuotation}
-              onChange={(e) => setCustomerQuotation(e.target.value)}
-              placeholder={"QT-0000 · Scope, line items, validity, payment terms…"}
-              rows={3}
-            />
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                onChange={(e) => handleAttachment(e.target.files?.[0])}
-              />
-              <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
-                <Upload className="h-3.5 w-3.5" />
-                {quotationAttachment ? "Replace file" : "Attach quotation (PDF or image)"}
-              </Button>
-              {quotationAttachment && (
-                <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs">
-                  <Paperclip className="h-3 w-3" />
-                  <span className="max-w-[160px] truncate">{quotationAttachment.name}</span>
-                  <a href={quotationAttachment.dataUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                    <Eye className="h-3 w-3" />
-                  </a>
-                  <button type="button" onClick={() => setQuotationAttachment(null)} className="text-muted-foreground hover:text-destructive">
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              )}
             </div>
           </Field>
 
