@@ -17,6 +17,7 @@ import {
   Eye,
   X,
   ShoppingCart,
+  Minus,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -452,9 +453,15 @@ function OrderFormSheet({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
   const [quotationAttachment, setQuotationAttachment] = useState<QuotationAttachment | null>(null);
-  const [cartItems, setCartItems] = useState<OrderItem[]>([
-    { id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 },
-  ]);
+
+  // Item Adder controls state
+  const [selectedInventoryId, setSelectedInventoryId] = useState<string>("");
+  const [addItemName, setAddItemName] = useState<string>("");
+  const [addItemPrice, setAddItemPrice] = useState<string>("");
+  const [addItemQty, setAddItemQty] = useState<string>("1");
+
+  // Static Cart items state
+  const [cartItems, setCartItems] = useState<OrderItem[]>([]);
   const [dateToBeDelivered, setDelivery] = useState("");
   const [handledBy, setHandledBy] = useState("");
   const [notes, setNotes] = useState("");
@@ -467,7 +474,11 @@ function OrderFormSheet({
       setSelectedCustomerId("");
       setCustomerName("");
       setQuotationAttachment(null);
-      setCartItems([{ id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 }]);
+      setCartItems([]);
+      setSelectedInventoryId("");
+      setAddItemName("");
+      setAddItemPrice("");
+      setAddItemQty("1");
       setDelivery("");
       setHandledBy(employees[0]?.name || "");
       setNotes("");
@@ -479,7 +490,12 @@ function OrderFormSheet({
   }, [cartItems]);
 
   const valid =
-    lpoNumber.trim() && dateReceived && customerName.trim() && dateToBeDelivered && handledBy.trim();
+    lpoNumber.trim() &&
+    dateReceived &&
+    customerName.trim() &&
+    dateToBeDelivered &&
+    handledBy.trim() &&
+    cartItems.length > 0;
 
   function handleAttachment(file: File | undefined) {
     if (!file) return;
@@ -499,66 +515,99 @@ function OrderFormSheet({
     reader.readAsDataURL(file);
   }
 
-  function handleAddItem() {
-    setCartItems((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 },
-    ]);
+  function handleSelectInventory(itemId: string) {
+    if (itemId === "custom") {
+      setSelectedInventoryId("");
+      setAddItemName("");
+      setAddItemPrice("0");
+      return;
+    }
+    const found = inventoryItems.find((i) => i.id === itemId);
+    if (found) {
+      setSelectedInventoryId(found.id);
+      setAddItemName(found.name);
+      setAddItemPrice(String(found.sellingPrice || 0));
+    }
+  }
+
+  function handleAddItemToCart() {
+    const name = addItemName.trim();
+    const price = parseFloat(addItemPrice) || 0;
+    const qty = Math.max(1, parseInt(addItemQty, 10) || 1);
+    if (!name) {
+      toast.error("Please select or enter an item name");
+      return;
+    }
+
+    setCartItems((prev) => {
+      const existingIndex = prev.findIndex(
+        (i) => (selectedInventoryId && i.itemId === selectedInventoryId) || i.name.toLowerCase() === name.toLowerCase()
+      );
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        const existing = updated[existingIndex];
+        const newQty = existing.quantity + qty;
+        updated[existingIndex] = {
+          ...existing,
+          quantity: newQty,
+          total: newQty * existing.unitPrice,
+        };
+        toast.success(`Updated ${name} quantity to ${newQty}`);
+        return updated;
+      }
+      toast.success(`Added ${name} to cart`);
+      return [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          itemId: selectedInventoryId || undefined,
+          name,
+          quantity: qty,
+          unitPrice: price,
+          total: qty * price,
+        },
+      ];
+    });
+
+    // Reset adder form
+    setSelectedInventoryId("");
+    setAddItemName("");
+    setAddItemPrice("");
+    setAddItemQty("1");
+  }
+
+  function handleIncreaseQty(id: string) {
+    setCartItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const q = item.quantity + 1;
+        return { ...item, quantity: q, total: q * item.unitPrice };
+      })
+    );
+  }
+
+  function handleDecreaseQty(id: string) {
+    setCartItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const q = Math.max(1, item.quantity - 1);
+        return { ...item, quantity: q, total: q * item.unitPrice };
+      })
+    );
   }
 
   function handleRemoveItem(id: string) {
-    setCartItems((prev) => {
-      const next = prev.filter((item) => item.id !== id);
-      return next.length > 0
-        ? next
-        : [{ id: crypto.randomUUID(), name: "", quantity: 1, unitPrice: 0, total: 0 }];
-    });
-  }
-
-  function handleItemChange(id: string, field: keyof OrderItem, val: any) {
-    setCartItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const updated = { ...item, [field]: val };
-        if (field === "quantity" || field === "unitPrice") {
-          const q = field === "quantity" ? Number(val) || 0 : Number(item.quantity) || 0;
-          const p = field === "unitPrice" ? Number(val) || 0 : Number(item.unitPrice) || 0;
-          updated.total = q * p;
-        }
-        return updated;
-      })
-    );
-  }
-
-  function handleSelectInventoryItem(id: string, itemId: string) {
-    const found = inventoryItems.find((i) => i.id === itemId);
-    if (!found) return;
-    setCartItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const qty = Number(item.quantity) || 1;
-        const price = Number(found.sellingPrice) || 0;
-        return {
-          ...item,
-          itemId: found.id,
-          name: found.name,
-          unitPrice: price,
-          total: qty * price,
-        };
-      })
-    );
+    setCartItems((prev) => prev.filter((item) => item.id !== id));
   }
 
   function submit() {
     if (!valid) return;
-    const cleanItems = cartItems
-      .filter((i) => i.name.trim() !== "")
-      .map((i) => ({
-        ...i,
-        quantity: Number(i.quantity) || 0,
-        unitPrice: Number(i.unitPrice) || 0,
-        total: (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0),
-      }));
+    const cleanItems = cartItems.map((i) => ({
+      ...i,
+      quantity: Number(i.quantity) || 1,
+      unitPrice: Number(i.unitPrice) || 0,
+      total: (Number(i.quantity) || 1) * (Number(i.unitPrice) || 0),
+    }));
 
     onCreate({
       id: crypto.randomUUID(),
@@ -571,7 +620,7 @@ function OrderFormSheet({
       handledBy: handledBy.trim(),
       status: "confirmed",
       amount: grandTotal,
-      items: cleanItems.length > 0 ? cleanItems : undefined,
+      items: cleanItems,
       notes: notes.trim() || undefined,
       createdAt: new Date().toISOString(),
     });
@@ -645,121 +694,176 @@ function OrderFormSheet({
             </div>
           </Field>
 
-          {/* Cart Format - Multi Item List */}
-          <div className="rounded-xl border border-border bg-slate-50/50 p-3 space-y-3 dark:bg-slate-900/40">
+          {/* Cart Section - Interactive POS / E-Commerce Style */}
+          <div className="rounded-xl border border-border bg-slate-50/50 p-3.5 space-y-3 dark:bg-slate-900/40">
             <div className="flex items-center justify-between">
               <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <ShoppingCart className="h-3.5 w-3.5 text-primary" />
+                <ShoppingCart className="h-4 w-4 text-primary" />
                 Order Line Items (Cart)
               </Label>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleAddItem}
-                className="h-7 px-2 text-xs gap-1"
-              >
-                <Plus className="h-3 w-3" />
-                Add item
-              </Button>
+              <Badge variant="outline" className="text-[11px] font-mono bg-white">
+                {cartItems.length} {cartItems.length === 1 ? "item" : "items"}
+              </Badge>
             </div>
 
-            <div className="space-y-2.5">
-              {cartItems.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="rounded-lg border border-border bg-white p-2.5 space-y-2 shadow-sm dark:bg-slate-950"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-muted-foreground">
-                      Item #{index + 1}
-                    </span>
+            {/* Item Adder Controls */}
+            <div className="rounded-lg border border-border bg-white p-3 space-y-2.5 shadow-sm dark:bg-slate-950">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block">
+                Add Product / Item to Order
+              </span>
+
+              {inventoryItems.length > 0 && (
+                <Select value={selectedInventoryId || "custom"} onValueChange={handleSelectInventory}>
+                  <SelectTrigger className="h-9 text-xs bg-white">
+                    <SelectValue placeholder="Select product from inventory..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom" className="font-medium text-muted-foreground">
+                      + Custom / Other Item
+                    </SelectItem>
+                    {inventoryItems.map((inv) => (
+                      <SelectItem key={inv.id} value={inv.id}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate">{inv.name}</span>
+                          <span className="text-[11px] text-muted-foreground font-mono">
+                            (UGX {inv.sellingPrice.toLocaleString()})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-12 sm:col-span-5">
+                  <Input
+                    value={addItemName}
+                    onChange={(e) => {
+                      setAddItemName(e.target.value);
+                      if (selectedInventoryId) {
+                        const matched = inventoryItems.find((i) => i.id === selectedInventoryId);
+                        if (matched && matched.name !== e.target.value) {
+                          setSelectedInventoryId("");
+                        }
+                      }
+                    }}
+                    placeholder="Item name / description"
+                    className="h-8 text-xs bg-white"
+                  />
+                </div>
+                <div className="col-span-6 sm:col-span-3">
+                  <Input
+                    type="number"
+                    min="0"
+                    value={addItemPrice}
+                    onChange={(e) => setAddItemPrice(e.target.value)}
+                    placeholder="Price (UGX)"
+                    className="h-8 text-xs font-mono bg-white"
+                  />
+                </div>
+                <div className="col-span-6 sm:col-span-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={addItemQty}
+                    onChange={(e) => setAddItemQty(e.target.value)}
+                    placeholder="Qty"
+                    className="h-8 text-xs font-mono bg-white"
+                  />
+                </div>
+                <div className="col-span-12 sm:col-span-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddItemToCart}
+                    className="h-8 w-full text-xs gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Cart Items Static List */}
+            {cartItems.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-white/60 p-4 text-center dark:bg-slate-950/60">
+                <ShoppingCart className="mx-auto h-6 w-6 text-muted-foreground/60" />
+                <p className="mt-1 text-xs text-muted-foreground font-medium">Cart is empty</p>
+                <p className="text-[11px] text-muted-foreground/80">Select a product or enter item details above to add items to your cart.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {cartItems.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-white px-3 py-2.5 shadow-sm dark:bg-slate-950"
+                  >
+                    {/* Static Item Info */}
+                    <div className="min-w-[130px] flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-semibold text-muted-foreground">#{index + 1}</span>
+                        <h4 className="text-xs font-semibold text-foreground truncate">{item.name}</h4>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground font-mono">
+                        UGX {item.unitPrice.toLocaleString()} / unit
+                      </p>
+                    </div>
+
+                    {/* Quantity Stepper with Decrease (-) & Increase (+) buttons */}
+                    <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-1 border border-border">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDecreaseQty(item.id)}
+                        disabled={item.quantity <= 1}
+                        className="h-6 w-6 rounded-md text-foreground hover:bg-white hover:shadow-xs disabled:opacity-30"
+                        title="Decrease units"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="w-8 text-center font-mono text-xs font-bold text-foreground">
+                        {item.quantity}
+                      </span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleIncreaseQty(item.id)}
+                        className="h-6 w-6 rounded-md text-foreground hover:bg-white hover:shadow-xs"
+                        title="Increase units"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+
+                    {/* Static Line Total */}
+                    <div className="text-right min-w-[90px]">
+                      <span className="block font-mono text-xs font-bold text-foreground">
+                        UGX {item.total.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* Delete Action Button */}
                     <Button
                       type="button"
                       size="icon"
                       variant="ghost"
                       onClick={() => handleRemoveItem(item.id)}
-                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      title="Remove item from cart"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-
-                  {inventoryItems.length > 0 && (
-                    <Select
-                      value={item.itemId || "custom"}
-                      onValueChange={(v) => {
-                        if (v === "custom") {
-                          handleItemChange(item.id, "itemId", undefined);
-                        } else {
-                          handleSelectInventoryItem(item.id, v);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs bg-white">
-                        <SelectValue placeholder="Select product from inventory..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="custom" className="font-medium text-muted-foreground">
-                          Custom Item / Service
-                        </SelectItem>
-                        {inventoryItems.map((inv) => (
-                          <SelectItem key={inv.id} value={inv.id}>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="truncate">{inv.name}</span>
-                              <span className="text-[10px] text-muted-foreground font-mono">
-                                (UGX {inv.sellingPrice.toLocaleString()})
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-
-                  <Input
-                    value={item.name}
-                    onChange={(e) => handleItemChange(item.id, "name", e.target.value)}
-                    placeholder="Item name or description"
-                    className="h-8 text-xs"
-                  />
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Units (Qty)</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)}
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Price (UGX)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={item.unitPrice}
-                        onChange={(e) => handleItemChange(item.id, "unitPrice", e.target.value)}
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Total (UGX)</Label>
-                      <div className="h-8 flex items-center px-2.5 rounded-md border border-border bg-muted/40 font-mono text-xs font-medium text-foreground truncate">
-                        {((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* Grand Total Footer */}
-            <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+            <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3.5 py-2.5 text-sm font-semibold text-primary">
               <span>Grand Amount</span>
               <span className="font-mono text-base font-bold">
                 UGX {grandTotal.toLocaleString()}
