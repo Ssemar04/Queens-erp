@@ -516,57 +516,77 @@ def sync_debtor_from_sale(sale, receipt_number, created_at, cust_id):
 
 
 def delete_transaction_by_receipt(receipt_number):
+    if not receipt_number:
+        return False
+    receipt_number = str(receipt_number).strip()
+
     db = get_db()
-    # 1. Fetch transactions for this receipt to get customer and amount info
+    # 1. Fetch transactions for this receipt
     txns = db.execute(
-        "SELECT id, item_id, quantity, total_amount, balance, customer_id FROM transactions WHERE transaction_number = ?",
-        (receipt_number,),
+        "SELECT id, item_id, quantity, total_amount, balance, customer_id FROM transactions WHERE transaction_number = ? OR reference = ?",
+        (receipt_number, receipt_number),
     ).fetchall()
 
-    # 2. Restore item stock levels for all movements linked to this receipt
+    # 2. Fetch stock movements linked to this receipt
+    like_pattern = f'%"{receipt_number}"%'
     movements = db.execute(
-        "SELECT id, item_id, movement_type, quantity FROM stock_movements WHERE reference = ?",
-        (receipt_number,),
+        "SELECT id, item_id, movement_type, quantity, sale FROM stock_movements WHERE reference = ? OR sale LIKE ?",
+        (receipt_number, like_pattern),
     ).fetchall()
 
     if not txns and not movements:
         return False
 
+    now = current_timestamp()
+
+    # 3. Restore item stock levels
     for m in movements:
         item_id = m["item_id"]
-        qty = abs(int(m["quantity"] or 0))
-        m_type = m["movement_type"]
+        raw_qty = m["quantity"]
+        try:
+            qty = abs(int(float(raw_qty or 0)))
+        except (ValueError, TypeError):
+            qty = 0
+
+        m_type = str(m["movement_type"] or "").lower()
         if item_id and qty > 0:
             if m_type in ("shipped", "sale"):
                 db.execute(
                     "UPDATE items SET current_stock = current_stock + ?, updated_at = ? WHERE id = ?",
-                    (qty, current_timestamp(), item_id),
+                    (qty, now, item_id),
                 )
-            elif m_type == "received":
+            elif m_type in ("received", "purchase"):
                 db.execute(
                     "UPDATE items SET current_stock = MAX(0, current_stock - ?), updated_at = ? WHERE id = ?",
-                    (qty, current_timestamp(), item_id),
+                    (qty, now, item_id),
                 )
 
-    # 3. Reverse customer statistics if customer was associated
+    # 4. Reverse customer statistics if customer was associated
     for t in txns:
         cust_id = t["customer_id"]
-        tot = float(t["total_amount"] or 0)
-        bal = float(t["balance"] or 0)
+        try:
+            tot = float(t["total_amount"] or 0)
+        except (ValueError, TypeError):
+            tot = 0.0
+        try:
+            bal = float(t["balance"] or 0)
+        except (ValueError, TypeError):
+            bal = 0.0
+
         if cust_id:
             db.execute(
                 """
                 UPDATE customers
-                SET lifetime_value = MAX(0, lifetime_value - ?),
-                    outstanding_balance = MAX(0, outstanding_balance - ?),
+                SET lifetime_value = MAX(0.0, lifetime_value - ?),
+                    outstanding_balance = MAX(0.0, outstanding_balance - ?),
                     total_orders = MAX(0, total_orders - 1),
                     updated_at = ?
                 WHERE id = ?
                 """,
-                (tot, bal, current_timestamp(), cust_id),
+                (tot, bal, now, cust_id),
             )
 
-    # 4. Clean up associated debtor ledger entries and payments
+    # 5. Clean up associated debtor ledger entries and payments
     ledger_entries = db.execute(
         "SELECT id FROM ledger_entries WHERE reference = ? AND kind = 'debtor'",
         (receipt_number,),
@@ -575,9 +595,9 @@ def delete_transaction_by_receipt(receipt_number):
         db.execute("DELETE FROM ledger_payments WHERE entry_id = ?", (le["id"],))
     db.execute("DELETE FROM ledger_entries WHERE reference = ? AND kind = 'debtor'", (receipt_number,))
 
-    # 5. Delete transactions and stock_movements
-    db.execute("DELETE FROM transactions WHERE transaction_number = ?", (receipt_number,))
-    db.execute("DELETE FROM stock_movements WHERE reference = ?", (receipt_number,))
+    # 6. Delete transactions and stock_movements
+    db.execute("DELETE FROM transactions WHERE transaction_number = ? OR reference = ?", (receipt_number, receipt_number))
+    db.execute("DELETE FROM stock_movements WHERE reference = ? OR sale LIKE ?", (receipt_number, like_pattern))
 
     db.commit()
     return True
