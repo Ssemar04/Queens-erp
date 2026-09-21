@@ -13,14 +13,14 @@ from services.employees_service import (
     reset_employee_credentials,
     update_employee_account,
 )
-from routes.guards import require_admin_user
+from routes.guards import require_admin_user, require_current_user
 
 employees_bp = Blueprint("employees", __name__, url_prefix="/api/employees")
 
 
 @employees_bp.route("", methods=["GET"])
 def list_employees():
-    _, error = require_admin_user()
+    _, error = require_current_user()
     if error:
         return error
     employees = get_employees()
@@ -29,7 +29,7 @@ def list_employees():
 
 @employees_bp.route("/<emp_id>", methods=["GET"])
 def get_single_employee(emp_id):
-    _, error = require_admin_user()
+    _, error = require_current_user()
     if error:
         return error
     emp = get_employee(emp_id)

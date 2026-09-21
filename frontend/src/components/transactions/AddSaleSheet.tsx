@@ -29,6 +29,7 @@ import type {
 import { useEmployees } from "@/components/employees/employees-store";
 import { useAssetsStore } from "@/components/assets/assets-store";
 import { useCustomers, type Customer } from "@/components/customers/customers-store";
+import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 
 interface Props {
@@ -84,6 +85,7 @@ interface CartLineItem extends SaleItem {
 }
 
 export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMovement, isSaving }: Props) {
+  const { user } = useAuth();
   const { employees } = useEmployees();
   const assetsStore = useAssetsStore();
   const { customers, loading: customersLoading } = useCustomers();
@@ -109,7 +111,10 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
   const [lineItems, setLineItems] = useState<CartLineItem[]>([]);
 
   const selected = items.find((i) => i.id === itemId);
-  const activeStaff = employees.filter((e) => e.status === "active");
+  const activeStaff = useMemo(() => {
+    const list = employees.filter((e) => !e.status || e.status.toLowerCase() === "active" || e.status.toLowerCase() === "probation");
+    return list;
+  }, [employees]);
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) ?? null;
 
   useEffect(() => {
@@ -125,7 +130,8 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       setPaymentMethod("cash");
       setAmountTendered("0");
       setIsCustomTendered(false);
-      setStaff(activeStaff[0]?.name ?? "");
+      const userName = (user?.user_metadata?.full_name as string) || (user?.email?.split("@")[0]) || "";
+      setStaff(activeStaff[0]?.name ?? userName ?? "");
       setSelectedCustomerId(null);
       setCustomerFocused(false);
       setCustomer("");
@@ -759,6 +765,9 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                     {activeStaff.map((e) => (
                       <SelectItem key={e.id} value={e.name}>{getLastName(e.name)}</SelectItem>
                     ))}
+                    {staff && !activeStaff.some((e) => e.name === staff) && (
+                      <SelectItem value={staff}>{getLastName(staff)}</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 {errors.staff && <p className="mt-1 text-xs text-destructive">{errors.staff}</p>}

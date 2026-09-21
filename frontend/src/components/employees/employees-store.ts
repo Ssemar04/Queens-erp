@@ -140,7 +140,6 @@ export function employeeInitials(name: string): string {
 
 export function useEmployees() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isAdmin } = useRole();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [ready, setReady] = useState(false);
 
@@ -151,7 +150,7 @@ export function useEmployees() {
       return () => { cancelled = true; };
     }
 
-    if (!isAuthenticated || !isAdmin) {
+    if (!isAuthenticated) {
       setEmployees([]);
       setReady(true);
       return () => { cancelled = true; };
@@ -171,7 +170,7 @@ export function useEmployees() {
 
     load();
     return () => { cancelled = true; };
-  }, [authLoading, isAdmin, isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const assertCanUseBackend = useCallback(() => {
     if (!isAuthenticated) throw new Error("Sign in to continue");
