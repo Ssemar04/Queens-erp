@@ -13,6 +13,7 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { MovementType } from "@/types/inventory";
 import type { Item, SaleDetails, StockMovement, TransactionStatus } from "@/types/inventory";
 import {
+  deleteMovementTransaction,
   fetchCatalogServiceItems,
   fetchMovementTransactions,
   saveMovementTransactions,
@@ -196,6 +197,27 @@ function TransactionsPage() {
     [queryClient],
   );
 
+  const handleDeleteTransaction = useCallback(
+    async (receiptNumber: string) => {
+      try {
+        await deleteMovementTransaction(receiptNumber);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["backend", "movements"] }),
+          queryClient.invalidateQueries({ queryKey: ["backend", "movement-items"] }),
+          queryClient.invalidateQueries({ queryKey: ["backend", "customers"] }),
+          queryClient.invalidateQueries({ queryKey: ["db", "stock_movements"] }),
+          queryClient.invalidateQueries({ queryKey: ["db", "transactions"] }),
+          queryClient.invalidateQueries({ queryKey: ["db", "items"] }),
+        ]);
+        toast.success(`Sale transaction ${receiptNumber} deleted and stock restored`);
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        toast.error(error.message || "Failed to delete sale transaction");
+      }
+    },
+    [queryClient],
+  );
+
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <div className="flex items-center justify-between">
@@ -248,7 +270,12 @@ function TransactionsPage() {
             onAction={() => setFormOpen(true)}
           />
         ) : (
-          <TransactionsTable transactions={transactions} itemNameMap={itemNameMap} onUpdateStatus={handleUpdateStatus} />
+          <TransactionsTable
+            transactions={transactions}
+            itemNameMap={itemNameMap}
+            onUpdateStatus={handleUpdateStatus}
+            onDeleteTransaction={handleDeleteTransaction}
+          />
         )}
       </ErrorBoundary>
 

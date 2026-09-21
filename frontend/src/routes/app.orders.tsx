@@ -56,6 +56,7 @@ import type { Customer } from "@/services/api";
 import type { Item } from "@/types/inventory";
 import type { OrderItem, OrderStatus, QuotationAttachment, SalesOrder } from "@/types/sales-order";
 import type { Employee } from "@/components/employees/employees-store";
+import { useRole } from "@/hooks/useRole";
 
 export const Route = createFileRoute("/app/orders")({
   component: OrdersPage,
@@ -81,6 +82,7 @@ function nextLpo(orders: SalesOrder[]): string {
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 function OrdersPage() {
+  const { isAdmin } = useRole();
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -184,6 +186,10 @@ function OrdersPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!isAdmin) {
+      toast.error("Admin access required to delete orders");
+      return;
+    }
     try {
       await deleteOrder(id);
       setOrders((current) => current.filter((o) => o.id !== id));
@@ -374,14 +380,17 @@ function OrdersPage() {
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                        onClick={() => handleDelete(o.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                          onClick={() => handleDelete(o.id)}
+                          title="Delete sales order"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

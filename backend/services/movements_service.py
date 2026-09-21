@@ -513,3 +513,71 @@ def sync_debtor_from_sale(sale, receipt_number, created_at, cust_id):
         )
 
     return entry_id
+
+
+def delete_transaction_by_receipt(receipt_number):
+    db = get_db()
+    # 1. Fetch transactions for this receipt to get customer and amount info
+    txns = db.execute(
+        "SELECT id, item_id, quantity, total_amount, balance, customer_id FROM transactions WHERE transaction_number = ?",
+        (receipt_number,),
+    ).fetchall()
+
+    # 2. Restore item stock levels for all movements linked to this receipt
+    movements = db.execute(
+        "SELECT id, item_id, movement_type, quantity FROM stock_movements WHERE reference = ?",
+        (receipt_number,),
+    ).fetchall()
+
+    if not txns and not movements:
+        return False
+
+    for m in movements:
+        item_id = m["item_id"]
+        qty = abs(int(m["quantity"] or 0))
+        m_type = m["movement_type"]
+        if item_id and qty > 0:
+            if m_type in ("shipped", "sale"):
+                db.execute(
+                    "UPDATE items SET current_stock = current_stock + ?, updated_at = ? WHERE id = ?",
+                    (qty, current_timestamp(), item_id),
+                )
+            elif m_type == "received":
+                db.execute(
+                    "UPDATE items SET current_stock = MAX(0, current_stock - ?), updated_at = ? WHERE id = ?",
+                    (qty, current_timestamp(), item_id),
+                )
+
+    # 3. Reverse customer statistics if customer was associated
+    for t in txns:
+        cust_id = t["customer_id"]
+        tot = float(t["total_amount"] or 0)
+        bal = float(t["balance"] or 0)
+        if cust_id:
+            db.execute(
+                """
+                UPDATE customers
+                SET lifetime_value = MAX(0, lifetime_value - ?),
+                    outstanding_balance = MAX(0, outstanding_balance - ?),
+                    total_orders = MAX(0, total_orders - 1),
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (tot, bal, current_timestamp(), cust_id),
+            )
+
+    # 4. Clean up associated debtor ledger entries and payments
+    ledger_entries = db.execute(
+        "SELECT id FROM ledger_entries WHERE reference = ? AND kind = 'debtor'",
+        (receipt_number,),
+    ).fetchall()
+    for le in ledger_entries:
+        db.execute("DELETE FROM ledger_payments WHERE entry_id = ?", (le["id"],))
+    db.execute("DELETE FROM ledger_entries WHERE reference = ? AND kind = 'debtor'", (receipt_number,))
+
+    # 5. Delete transactions and stock_movements
+    db.execute("DELETE FROM transactions WHERE transaction_number = ?", (receipt_number,))
+    db.execute("DELETE FROM stock_movements WHERE reference = ?", (receipt_number,))
+
+    db.commit()
+    return True

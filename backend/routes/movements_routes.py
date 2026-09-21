@@ -5,7 +5,7 @@ import traceback
 from flask import Blueprint, jsonify, request
 
 from models.serializers import movement_from_row
-from routes.guards import require_current_user
+from routes.guards import require_admin_user, require_current_user
 from services import movements_service
 
 movements_bp = Blueprint("movements", __name__)
@@ -143,12 +143,16 @@ def create_movements_bulk():
 
 @movements_bp.route("/api/movements/receipt/<receipt_number>/status", methods=["PATCH"])
 def update_transaction_status(receipt_number):
-    _, auth_error = require_current_user()
-    if auth_error:
-        return auth_error
-
     data = request.get_json(silent=True) or {}
     status = data.get("status")
+
+    if status == "void":
+        _, auth_error = require_admin_user()
+    else:
+        _, auth_error = require_current_user()
+
+    if auth_error:
+        return auth_error
 
     if not status:
         return jsonify({
@@ -177,3 +181,29 @@ def update_transaction_status(receipt_number):
         "message": "Transaction status updated",
         "movements": [movement_from_row(r) for r in updated_rows],
     })
+
+
+@movements_bp.route("/api/movements/receipt/<receipt_number>", methods=["DELETE"])
+def delete_transaction_by_receipt(receipt_number):
+    _, auth_error = require_admin_user()
+    if auth_error:
+        return auth_error
+
+    try:
+        success = movements_service.delete_transaction_by_receipt(receipt_number)
+        if not success:
+            return jsonify({
+                "success": False,
+                "message": "Transaction receipt not found",
+            }), 404
+        return jsonify({
+            "success": True,
+            "message": "Sale transaction deleted and stock restored",
+        })
+    except Exception as exc:
+        print(f"[movements.delete_transaction] exception: {exc}", file=sys.stderr)
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "message": f"Failed to delete sale transaction: {exc}",
+        }), 500

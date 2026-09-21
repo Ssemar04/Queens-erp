@@ -390,6 +390,10 @@ export const updateTransactionStatusByReceipt = async (
   return response.data;
 };
 
+export const deleteTransactionByReceipt = async (receiptNumber: string): Promise<void> => {
+  await api.delete(`/movements/receipt/${encodeURIComponent(receiptNumber)}`);
+};
+
 export const getOrders = async (): Promise<SalesOrder[]> => {
   const response = await api.get("/orders");
   return response.data;

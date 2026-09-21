@@ -3,6 +3,7 @@ import type { ItemFilters } from "@/lib/demo-store";
 import {
   createCatalogMovement,
   createCatalogMovements,
+  deleteTransactionByReceipt,
   getItems,
   getMovements,
   updateTransactionStatusByReceipt,
@@ -32,4 +33,8 @@ export async function updateMovementTransactionStatus(
 ): Promise<StockMovement[]> {
   const result = await updateTransactionStatusByReceipt(receiptNumber, status);
   return result.movements;
+}
+
+export async function deleteMovementTransaction(receiptNumber: string): Promise<void> {
+  await deleteTransactionByReceipt(receiptNumber);
 }

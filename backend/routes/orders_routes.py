@@ -3,7 +3,7 @@ import sqlite3
 from flask import Blueprint, jsonify, request
 
 from models.serializers import purchase_order_from_record, sales_order_from_row
-from routes.guards import require_current_user
+from routes.guards import require_admin_user, require_current_user
 from services import orders_service
 
 orders_bp = Blueprint("orders", __name__)
@@ -94,7 +94,7 @@ def update_order(order_id):
 
 @orders_bp.route("/api/orders/<order_id>", methods=["DELETE"])
 def delete_order(order_id):
-    _, auth_error = require_current_user()
+    _, auth_error = require_admin_user()
     if auth_error:
         return auth_error
 

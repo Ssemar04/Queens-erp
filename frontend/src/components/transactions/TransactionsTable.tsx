@@ -16,6 +16,7 @@ import {
   Download,
   Copy,
   ChevronDown,
+  Trash2,
 } from "lucide-react";
 import {
   Table,
@@ -54,6 +55,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSettings } from "@/contexts/ThemeContext";
 import { useBranch } from "@/contexts/BranchContext";
+import { useRole } from "@/hooks/useRole";
 import { getReceiptSummary, printReceipt } from "@/components/transactions/receipt-printer";
 import { exportReceipt } from "@/components/transactions/receipt-exporter";
 import { format } from "date-fns";
@@ -65,6 +67,7 @@ interface Props {
   itemNameMap: Map<string, string>;
   initialQuery?: string;
   onUpdateStatus?: (receiptNumber: string, status: TransactionStatus) => Promise<void> | void;
+  onDeleteTransaction?: (receiptNumber: string) => Promise<void> | void;
 }
 
 export function getLastName(name: string): string {
@@ -121,7 +124,8 @@ function StatusEditor({
   );
 }
 
-export function TransactionsTable({ transactions, itemNameMap, initialQuery = "", onUpdateStatus }: Props) {
+export function TransactionsTable({ transactions, itemNameMap, initialQuery = "", onUpdateStatus, onDeleteTransaction }: Props) {
+  const { isAdmin } = useRole();
   const [page, setPage] = useState(0);
   const [q, setQ] = useState(initialQuery);
   const [customer, setCustomer] = useState("all");
@@ -130,7 +134,9 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
   const [itemId, setItemId] = useState("all");
   const [balance, setBalance] = useState<RangeFilter>("any");
   const [receiptTarget, setReceiptTarget] = useState<GroupedTransaction | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<GroupedTransaction | null>(null);
   const [updatingReceipt, setUpdatingReceipt] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const { settings } = useSettings();
   const { branches, selectedBranch } = useBranch();
@@ -377,6 +383,11 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                     <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => printReceipt(t, itemNameMap, settings.companyDetails, resolveBranch(t))}>
                       <Printer className="h-3.5 w-3.5" /> Print
                     </Button>
+                    {isAdmin && onDeleteTransaction && (
+                      <Button size="sm" variant="outline" className="gap-1 text-xs text-destructive hover:bg-red-50 border-destructive/20" onClick={() => setDeleteTarget(t)} title="Delete sale">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -518,7 +529,7 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
-                            disabled={!onUpdateStatus || r.status === "void" || (updatingReceipt !== null && updatingReceipt !== r.receipt)}
+                            disabled={!isAdmin || !onUpdateStatus || r.status === "void" || (updatingReceipt !== null && updatingReceipt !== r.receipt)}
                             onSelect={async () => {
                               if (onUpdateStatus) {
                                 try {
@@ -532,6 +543,17 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                           >
                             <Ban className="mr-2 h-4 w-4" /> Void
                           </DropdownMenuItem>
+                          {isAdmin && onDeleteTransaction && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive font-medium"
+                                onSelect={() => setDeleteTarget(t)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete sale
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -553,6 +575,40 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
           if (!open) setReceiptTarget(null);
         }}
       />
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> Delete sale transaction?
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-slate-600">
+              Are you sure you want to delete transaction <strong className="font-mono text-slate-900">{deleteTarget?.receiptNumber}</strong>?
+              <br /><br />
+              This action will permanently delete the transaction record and <strong className="text-slate-900">restore inventory stock levels</strong> for all items in this sale.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end pt-4">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={async () => {
+                if (deleteTarget && onDeleteTransaction) {
+                  try {
+                    setIsDeleting(true);
+                    await onDeleteTransaction(deleteTarget.receiptNumber);
+                    setDeleteTarget(null);
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }
+              }}
+            >
+              {isDeleting ? "Deleting..." : "Delete sale"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
