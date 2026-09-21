@@ -445,7 +445,7 @@ export function SystemSettings() {
           <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
             <span>© 2026 CodesmanHouse Inc. All rights reserved.</span>
             <span className="flex items-center gap-1 text-[11px]">
-              Crafted with <Heart className="h-3 w-3 fill-rose-500 text-rose-500 inline" /> for modern enterprise operations
+              Crafted for modern enterprise operations
             </span>
           </div>
         </CardContent>

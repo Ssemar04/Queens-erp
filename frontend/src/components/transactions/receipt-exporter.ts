@@ -86,11 +86,15 @@ export function generateReceiptCanvas(
   const padding = 32;
   const contentWidth = width - padding * 2;
 
-  // Measure dynamic height
-  let estimatedHeight = 320; // Header, info, totals, barcode
+  // Measure dynamic height (brand band 120 + meta ~88 + particulars ~62 + totals ~132 + barcode ~80 + slogan ~24 + paddings)
+  let estimatedHeight = 120 + 320; // Brand header band + rest of static sections
   estimatedHeight += r.lineItems.length * 48;
   canvas.width = width;
   canvas.height = estimatedHeight;
+
+  const BRAND = "#003399";
+  const BRAND_SOFT = "rgba(0,51,153,0.08)";
+  const BRAND_LINE = "rgba(0,51,153,0.25)";
 
   // Background
   ctx.fillStyle = "#FFFFFF";
@@ -98,8 +102,16 @@ export function generateReceiptCanvas(
 
   let y = padding;
 
-  // Header - Company Name
-  ctx.fillStyle = "#0F172A";
+  // Branded Header Band
+  const headerBandHeight = 120;
+  const grad = ctx.createLinearGradient(0, 0, width, 0);
+  grad.addColorStop(0, BRAND);
+  grad.addColorStop(1, "#0042b3");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, headerBandHeight);
+
+  // Company Name (white on brand)
+  ctx.fillStyle = "#FFFFFF";
   ctx.font = "bold 24px system-ui, -apple-system, sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(companyInfo.name.toUpperCase(), width / 2, y + 20);
@@ -109,7 +121,7 @@ export function generateReceiptCanvas(
   const locationLine = [companyInfo.location, companyInfo.floorNumber, companyInfo.roomNumber].filter(Boolean).join(" - ");
   const contactLine = companyInfo.contactLine || [companyInfo.phone, companyInfo.email].filter(Boolean).join(" / ");
 
-  ctx.fillStyle = "#475569";
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
   ctx.font = "13px system-ui, -apple-system, sans-serif";
   if (locationLine) {
     ctx.fillText(locationLine, width / 2, y + 12);
@@ -122,8 +134,8 @@ export function generateReceiptCanvas(
 
   y += 10;
 
-  // Receipt ID Badge
-  ctx.fillStyle = "#F1F5F9";
+  // Receipt ID Badge (inverted white pill)
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
   ctx.beginPath();
   if (ctx.roundRect) {
     ctx.roundRect(width / 2 - 140, y, 280, 32, 6);
@@ -131,11 +143,14 @@ export function generateReceiptCanvas(
     ctx.rect(width / 2 - 140, y, 280, 32);
   }
   ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
-  ctx.fillStyle = "#0F172A";
+  ctx.fillStyle = "#FFFFFF";
   ctx.font = "bold 15px monospace";
   ctx.fillText(`RECEIPT ${r.receipt}`, width / 2, y + 21);
-  y += 44;
+  y = headerBandHeight + padding;
 
   // Dashed Divider
   ctx.strokeStyle = "#CBD5E1";
@@ -184,10 +199,37 @@ export function generateReceiptCanvas(
 
   y += 10;
 
+  // Particulars Section Header
+  ctx.fillStyle = BRAND_SOFT;
+  ctx.fillRect(padding, y, contentWidth, 28);
+  ctx.strokeStyle = BRAND_LINE;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padding, y);
+  ctx.lineTo(width - padding, y);
+  ctx.moveTo(padding, y + 28);
+  ctx.lineTo(width - padding, y + 28);
+  ctx.stroke();
+
+  ctx.fillStyle = BRAND;
+  ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
+  ctx.textAlign = "left";
+  ctx.letterSpacing = "1px";
+  ctx.fillText("◆  PARTICULARS", padding + 10, y + 18);
+  ctx.letterSpacing = "0px";
+  ctx.textAlign = "right";
+  ctx.font = "10px monospace";
+  ctx.fillStyle = BRAND;
+  ctx.globalAlpha = 0.75;
+  ctx.fillText(`${r.lineItems.length} line${r.lineItems.length === 1 ? "" : "s"}`, width - padding - 10, y + 18);
+  ctx.globalAlpha = 1;
+  y += 34;
+
   // Line items Table Header
-  ctx.fillStyle = "#F8FAFC";
+  ctx.fillStyle = BRAND_SOFT;
   ctx.fillRect(padding, y, contentWidth, 26);
-  ctx.fillStyle = "#475569";
+  ctx.fillStyle = BRAND;
+  ctx.globalAlpha = 0.8;
   ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
   ctx.textAlign = "left";
   ctx.fillText("ITEM DESCRIPTION", padding + 8, y + 17);
@@ -195,6 +237,7 @@ export function generateReceiptCanvas(
   ctx.fillText("QTY", width - padding - 150, y + 17);
   ctx.textAlign = "right";
   ctx.fillText("AMOUNT", width - padding - 8, y + 17);
+  ctx.globalAlpha = 1;
   y += 32;
 
   // Line Items
@@ -221,10 +264,12 @@ export function generateReceiptCanvas(
     ctx.fillText(String(li.quantity), width - padding - 150, y + 8);
 
     ctx.textAlign = "right";
+    ctx.fillStyle = BRAND;
+    ctx.font = "bold 13px monospace";
     ctx.fillText(fmtMoney(li.lineTotal), width - padding - 8, y + 8);
 
     y += 36;
-    ctx.strokeStyle = "#F1F5F9";
+    ctx.strokeStyle = BRAND_LINE;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(padding + 8, y - 6);
@@ -234,9 +279,12 @@ export function generateReceiptCanvas(
 
   y += 10;
 
-  // Totals Box
-  ctx.fillStyle = "#F8FAFC";
+  // Totals Box (brand themed)
+  ctx.fillStyle = BRAND_SOFT;
   ctx.fillRect(padding, y, contentWidth, 110 + (r.balance > 0 ? 22 : 0));
+  ctx.strokeStyle = BRAND_LINE;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(padding, y, contentWidth, 110 + (r.balance > 0 ? 22 : 0));
   let totalsY = y + 20;
 
   const drawTotalLine = (label: string, val: string, isBold = false, color = "#0F172A") => {
@@ -253,25 +301,32 @@ export function generateReceiptCanvas(
   };
 
   drawTotalLine("Subtotal", fmtMoney(subtotal));
-  if (totalDiscount > 0) drawTotalLine("Discount", fmtMoney(totalDiscount));
+  if (totalDiscount > 0) drawTotalLine("Discount", fmtMoney(totalDiscount), false, "#059669");
   if (totalVat > 0) drawTotalLine("VAT", fmtMoney(totalVat));
 
-  // Solid Divider line in Totals
-  ctx.strokeStyle = "#E2E8F0";
+  // Brand Divider line in Totals
+  ctx.strokeStyle = BRAND_LINE;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(padding + 16, totalsY - 14);
   ctx.lineTo(width - padding - 16, totalsY - 14);
   ctx.stroke();
 
-  drawTotalLine("TOTAL SALE", fmtMoney(r.total), true, "#0F172A");
+  drawTotalLine("TOTAL SALE", fmtMoney(r.total), true, BRAND);
   if (r.balance > 0) drawTotalLine("Outstanding Balance", fmtMoney(r.balance), true, "#D97706");
   const changeDue = r.lineItems.length > 0 && t.saleDetails?.changeDue ? t.saleDetails.changeDue : 0;
   if (changeDue > 0) drawTotalLine("Change Due", fmtMoney(changeDue), false, "#059669");
 
   y = totalsY + 16;
 
-  // Barcode Section
+  // Barcode Section (with brand top border)
+  ctx.strokeStyle = BRAND_LINE;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padding, y - 4);
+  ctx.lineTo(width - padding, y - 4);
+  ctx.stroke();
+
   const barcodeBars = encodeCode128B(r.receipt);
   const barScale = 2.4;
   let barX = (width - barcodeBars.reduce((s, w) => s + w * barScale, 0)) / 2;
@@ -287,15 +342,17 @@ export function generateReceiptCanvas(
   y += 50;
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#0F172A";
+  ctx.fillStyle = "#475569";
   ctx.font = "bold 12px monospace";
   ctx.fillText(r.receipt, width / 2, y);
   y += 20;
 
-  // Slogan
-  ctx.fillStyle = "#475569";
+  // Slogan (brand colored)
+  ctx.fillStyle = BRAND;
   ctx.font = "bold 12px system-ui, -apple-system, sans-serif";
+  ctx.letterSpacing = "0.5px";
   ctx.fillText((companyInfo.receiptSlogan || "THANK YOU FOR YOUR BUSINESS.").toUpperCase(), width / 2, y);
+  ctx.letterSpacing = "0px";
 
   // Resize canvas height accurately to fit drawn content
   const finalCanvas = document.createElement("canvas");

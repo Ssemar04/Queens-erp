@@ -2,17 +2,24 @@ import { useMemo, useState } from "react";
 import {
   Plus, Search, Wallet, AlertTriangle, TrendingUp, Clock, Banknote,
   ArrowDownToLine, ArrowUpFromLine, Sparkles, Trash2, Calendar,
+  Eye, CheckCircle2, FileText, Landmark, CreditCard, BadgeDollarSign, Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 import {
   ageDays, balance, bucket, nextReference, useLedger,
   type EntryStatus, type LedgerEntry, type LedgerKind,
@@ -48,6 +55,7 @@ export function LedgerPage({ kind }: Props) {
   const [bucketFilter, setBucketFilter] = useState<ReturnType<typeof bucket> | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
   const [paying, setPaying] = useState<LedgerEntry | null>(null);
+  const [previewing, setPreviewing] = useState<LedgerEntry | null>(null);
 
   const isDebtor = kind === "debtor";
   const titles = isDebtor
@@ -343,6 +351,15 @@ export function LedgerPage({ kind }: Props) {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 transition-all hover:shadow-[0_0_0_3px_rgba(59,130,246,0.12)]"
+                          onClick={() => setPreviewing(e)}
+                          title="Preview details"
+                        >
+                          <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                        </Button>
                         {e.status !== "paid" && e.status !== "draft" && (
                           <Button
                             size="sm"
@@ -404,6 +421,16 @@ export function LedgerPage({ kind }: Props) {
           toast.success(`UGX ${payment.amount.toLocaleString()} recorded`);
         }}
       />
+
+      <EntryPreviewDialog
+        entry={previewing}
+        kind={kind}
+        onOpenChange={(v) => !v && setPreviewing(null)}
+        onRecordPayment={(entry) => {
+          setPreviewing(null);
+          setPaying(entry);
+        }}
+      />
     </div>
   );
 }
@@ -428,5 +455,360 @@ function Kpi({
       <div className="mt-2 font-mono text-xl font-semibold text-foreground">{value}</div>
       {sub && <div className="mt-0.5 text-[11px] text-muted-foreground">{sub}</div>}
     </div>
+  );
+}
+
+const METHOD_META: Record<string, { label: string; icon: typeof Wallet }> = {
+  cash: { label: "Cash", icon: Banknote },
+  mpesa: { label: "M-Pesa", icon: CreditCard },
+  bank: { label: "Bank", icon: Landmark },
+  cheque: { label: "Cheque", icon: BadgeDollarSign },
+  card: { label: "Card", icon: CreditCard },
+};
+
+function EntryPreviewDialog({
+  entry,
+  kind,
+  onOpenChange,
+  onRecordPayment,
+}: {
+  entry: LedgerEntry | null;
+  kind: LedgerKind;
+  onOpenChange: (open: boolean) => void;
+  onRecordPayment: (entry: LedgerEntry) => void;
+}) {
+  const open = Boolean(entry);
+  if (!entry) return <Dialog open={open} onOpenChange={onOpenChange} />;
+
+  const isDebtor = kind === "debtor";
+  const bal = balance(entry);
+  const progress = entry.amount > 0 ? Math.min(100, (entry.paid / entry.amount) * 100) : 0;
+  const age = ageDays(entry);
+  const b = bucket(entry);
+
+  const sections = [
+    "aging",
+    "meta",
+    "financials",
+    entry.payments.length > 0 || true ? "payments" : null,
+    entry.promiseToPay ? "promise" : null,
+    entry.tags.length > 0 ? "tags" : null,
+    entry.notes ? "notes" : null,
+  ].filter(Boolean) as string[];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92vh] max-w-[min(96vw,720px)] overflow-hidden p-0">
+        {/* Header band */}
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className={`relative overflow-hidden px-6 py-5 pr-14 ${isDebtor ? "bg-gradient-to-br from-emerald-600 to-emerald-700 text-white" : "bg-gradient-to-br from-blue-600 to-blue-700 text-white"}`}
+        >
+          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
+          <div className="absolute -left-14 -bottom-20 h-56 w-56 rounded-full bg-white/5 blur-3xl" />
+          <div className="relative flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 backdrop-blur">
+                {isDebtor ? <ArrowDownToLine className="h-5 w-5" /> : <ArrowUpFromLine className="h-5 w-5" />}
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-mono text-xl font-semibold tracking-wide">{entry.reference}</h2>
+                  <Badge variant="outline" className="border-0 bg-white/10 text-white ring-1 ring-white/20 backdrop-blur capitalize">
+                    {entry.status}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-white/75">
+                  {isDebtor ? "Invoice · Accounts receivable" : "Bill · Accounts payable"}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] uppercase tracking-wider text-white/70">Balance</div>
+              <div className="font-mono text-2xl font-bold mt-0.5">UGX {bal.toLocaleString()}</div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Scrollable content */}
+        <div className="max-h-[calc(92vh-200px)] overflow-y-auto space-y-4 bg-muted/20 px-6 py-5">
+          {/* Aging strip */}
+          {sections.includes("aging") && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * sections.indexOf("aging"), duration: 0.25 }}
+              className="rounded-xl border border-border bg-white p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium", {
+                    "bg-emerald-500/10 text-emerald-700": age <= 0,
+                    "bg-amber-500/10 text-amber-700": age > 0 && age <= 30,
+                    "bg-orange-500/10 text-orange-700": age > 30 && age <= 60,
+                    "bg-rose-500/10 text-rose-700": age > 60 && age <= 90,
+                    "bg-red-500/10 text-red-700": age > 90,
+                  })}>
+                    <span className={cn("h-1.5 w-1.5 rounded-full", BUCKET_CLS[b])} />
+                    Bucket: <span className="font-semibold capitalize">{b}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {age > 0 ? <span className="text-destructive font-medium">{age}d overdue</span> : age === 0 ? "Due today" : <span className="text-emerald-600 font-medium">In {-age}d</span>}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground font-mono">
+                  {progress.toFixed(0)}% {isDebtor ? "collected" : "settled"}
+                </div>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <motion.div
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.7, delay: 0.12, ease: "easeOut" }}
+                  className={cn("h-full", progress >= 100 ? "bg-emerald-500" : bal === 0 ? "bg-emerald-500" : age > 60 ? "bg-rose-500" : age > 0 ? "bg-amber-500" : "bg-emerald-500")}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {/* Meta grid */}
+          {sections.includes("meta") && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * sections.indexOf("meta"), duration: 0.25 }}
+              className="grid grid-cols-2 gap-3 md:grid-cols-4"
+            >
+              <div className="rounded-xl border border-border bg-white p-3.5 col-span-2 md:col-span-1 md:col-span-2">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {isDebtor ? <CreditCard className="h-3 w-3" /> : <Landmark className="h-3 w-3" />}
+                  {isDebtor ? "Customer" : "Supplier"}
+                </div>
+                <div className="mt-1.5 text-sm font-medium text-foreground truncate" title={entry.partyName}>
+                  {entry.partyName}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-white p-3.5">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <Receipt className="h-3 w-3" />
+                  Party ref
+                </div>
+                <div className="mt-1.5 text-sm font-mono text-foreground">
+                  {entry.partyRef || "—"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-white p-3.5">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  Issue date
+                </div>
+                <div className="mt-1.5 text-sm font-medium text-foreground">{entry.issueDate}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-white p-3.5">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  Due date
+                </div>
+                <div className="mt-1.5 text-sm font-medium text-foreground">{entry.dueDate}</div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Financial summary */}
+          {sections.includes("financials") && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * sections.indexOf("financials"), duration: 0.25 }}
+              className="rounded-xl border border-border bg-muted/40 p-4"
+            >
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Amount</div>
+                  <div className="mt-1 font-mono text-lg font-semibold text-foreground">UGX {entry.amount.toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                    {isDebtor ? "Paid" : "Settled"}
+                  </div>
+                  <div className="mt-1 font-mono text-lg font-semibold text-emerald-600">UGX {entry.paid.toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {isDebtor ? "Outstanding" : "Owed"}
+                  </div>
+                  <div className={cn("mt-1 font-mono text-lg font-bold", bal > 0 ? (age > 30 ? "text-rose-600" : age > 0 ? "text-amber-600" : "text-emerald-700") : "text-emerald-600")}>
+                    UGX {bal.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white">
+                <motion.div
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.9, delay: 0.18, ease: "easeOut" }}
+                  className={cn("h-full", progress >= 100 ? "bg-emerald-500" : age > 60 ? "bg-rose-500" : age > 0 ? "bg-amber-500" : "bg-emerald-500")}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {/* Payment timeline */}
+          {sections.includes("payments") && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * sections.indexOf("payments"), duration: 0.25 }}
+              className="rounded-xl border border-border bg-white overflow-hidden"
+            >
+              <div className="border-b border-border bg-muted/40 px-4 py-2.5 flex items-center justify-between">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Banknote className="h-3 w-3" />
+                  Payment history
+                </div>
+                <span className="text-[10px] text-muted-foreground font-mono">{entry.payments.length} recorded</span>
+              </div>
+              {entry.payments.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <Sparkles className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                  <p className="mt-2 text-sm font-medium text-foreground">No payments recorded yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isDebtor ? "Record a payment from this customer to update the balance." : "Record a payment to this supplier to update the balance."}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/80">
+                  {[...entry.payments].reverse().map((p, idx) => {
+                    const meta = METHOD_META[p.method] ?? { label: p.method, icon: Banknote };
+                    const MethodIcon = meta.icon;
+                    return (
+                      <motion.div
+                        key={p.id}
+                        initial={{ opacity: 0, x: -4 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.15 + idx * 0.04, duration: 0.22 }}
+                        className="px-4 py-3 flex items-start gap-3 hover:bg-muted/30 transition-colors"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20">
+                          <MethodIcon className="h-4 w-4" />
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-medium text-foreground">{meta.label}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">· {p.date}</span>
+                            </div>
+                            <span className="font-mono text-sm font-semibold text-emerald-600 whitespace-nowrap">
+                              − UGX {p.amount.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                            {p.reference && (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono">
+                                Ref: {p.reference}
+                              </span>
+                            )}
+                            {p.note && (
+                              <span className="text-muted-foreground truncate max-w-[380px]">{p.note}</span>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Promise to pay */}
+          {sections.includes("promise") && entry.promiseToPay && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * sections.indexOf("promise"), duration: 0.25 }}
+              className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-start gap-3"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 ring-1 ring-amber-500/20">
+                <Calendar className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-amber-700 font-semibold">
+                  {isDebtor ? "Promise to pay" : "Promise to settle"}
+                </div>
+                <div className="mt-1 text-sm font-medium text-foreground">
+                  {isDebtor ? "Customer promised" : "You promised"} to settle by <span className="font-mono font-semibold">{entry.promiseToPay}</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Tags */}
+          {sections.includes("tags") && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * sections.indexOf("tags"), duration: 0.25 }}
+              className="rounded-xl border border-border bg-white p-4"
+            >
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Tags</div>
+              <div className="flex flex-wrap gap-1.5">
+                {entry.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground ring-1 ring-border/60"
+                  >
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Notes */}
+          {sections.includes("notes") && entry.notes && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * sections.indexOf("notes"), duration: 0.25 }}
+              className="rounded-xl border border-border bg-white p-4"
+            >
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                <FileText className="h-3 w-3" />
+                Notes
+              </div>
+              <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">
+                {entry.notes}
+              </p>
+            </motion.div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <DialogFooter className="flex items-center justify-between gap-2 border-t border-border bg-white px-6 py-3">
+          <div className="text-xs text-muted-foreground font-mono">
+            Created {entry.createdAt.slice(0, 10)}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+            {bal > 0 && entry.status !== "draft" && entry.status !== "disputed" && (
+              <Button
+                size="sm"
+                onClick={() => onRecordPayment(entry)}
+                className={cn(isDebtor ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white")}
+              >
+                <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
+                {isDebtor ? "Record payment" : "Record settlement"}
+              </Button>
+            )}
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
