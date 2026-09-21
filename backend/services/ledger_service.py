@@ -6,7 +6,23 @@ from services.database import get_db
 
 VALID_KINDS = {"debtor", "creditor"}
 VALID_STATUSES = {"draft", "open", "partial", "paid", "overdue", "disputed"}
-VALID_PAYMENT_METHODS = {"cash", "mpesa", "bank", "cheque", "card"}
+VALID_PAYMENT_METHODS = {
+    "cash", "mpesa", "bank", "cheque", "card",
+    "mobile", "mobile_money", "bank_transfer", "credit"
+}
+
+
+def normalize_payment_method(method):
+    if not method:
+        return "cash"
+    m = str(method).lower().strip()
+    if m in {"mobile_money", "mobile"}:
+        return "mpesa"
+    if m == "bank_transfer":
+        return "bank"
+    if m in VALID_PAYMENT_METHODS:
+        return m
+    return "cash"
 
 
 def current_timestamp():
@@ -54,15 +70,19 @@ def entry_with_payments(row):
 def compute_status(status, amount, paid, due_date):
     if status in {"draft", "disputed"}:
         return status
-    if max(0, amount - paid) == 0:
+    if max(0, float(amount or 0) - float(paid or 0)) <= 0.0001:
         return "paid"
 
-    try:
-        overdue = datetime.now(timezone.utc).date() > datetime.fromisoformat(due_date).date()
-    except ValueError:
-        overdue = False
+    overdue = False
+    if due_date:
+        try:
+            due_str = str(due_date).strip().split("T")[0]
+            dt_due = datetime.strptime(due_str, "%Y-%m-%d").date()
+            overdue = datetime.now(timezone.utc).date() > dt_due
+        except Exception:
+            overdue = False
 
-    if paid > 0:
+    if float(paid or 0) > 0:
         return "overdue" if overdue else "partial"
     return "overdue" if overdue else "open"
 
@@ -128,7 +148,8 @@ def create_payment(entry_id, payment):
     total_amt = float(row["amount"] or 0)
     status = compute_status(row["status"], total_amt, paid, row["due_date"])
 
-    get_db().execute(
+    db = get_db()
+    db.execute(
         """
         UPDATE ledger_entries
         SET paid = ?, status = ?, updated_at = CURRENT_TIMESTAMP
@@ -139,31 +160,46 @@ def create_payment(entry_id, payment):
 
     # Sync debtor payment with customers table and transactions table
     if row["kind"] == "debtor":
-        party_name = row["party_name"]
-        party_ref = row["party_ref"] or ""
-        
-        get_db().execute(
-            """
-            UPDATE customers
-            SET outstanding_balance = MAX(0.0, outstanding_balance - ?),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? OR LOWER(name) = LOWER(?) OR phone = ?
-            """,
-            (payment_amt, party_ref, party_name, party_ref),
-        )
+        party_name = (row["party_name"] or "").strip()
+        party_ref = (row["party_ref"] or "").strip()
+
+        if party_ref or party_name:
+            sql_parts = []
+            params = [payment_amt]
+            if party_ref:
+                sql_parts.append("id = ?")
+                params.append(party_ref)
+                sql_parts.append("phone = ?")
+                params.append(party_ref)
+            if party_name:
+                sql_parts.append("LOWER(name) = LOWER(?)")
+                params.append(party_name)
+
+            if sql_parts:
+                db.execute(
+                    f"""
+                    UPDATE customers
+                    SET outstanding_balance = MAX(0.0, outstanding_balance - ?),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE {" OR ".join(sql_parts)}
+                    """,
+                    params,
+                )
 
         rem_balance = max(0.0, total_amt - paid)
-        new_txn_status = "paid" if rem_balance == 0 else "partial"
-        get_db().execute(
-            """
-            UPDATE transactions
-            SET balance = ?, amount_paid = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE transaction_number = ?
-            """,
-            (rem_balance, paid, new_txn_status, row["reference"]),
-        )
+        new_txn_status = "paid" if rem_balance <= 0.0001 else "partial"
+        ref_num = (row["reference"] or "").strip()
+        if ref_num:
+            db.execute(
+                """
+                UPDATE transactions
+                SET balance = ?, amount_paid = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE transaction_number = ?
+                """,
+                (rem_balance, paid, new_txn_status, ref_num),
+            )
 
-    get_db().commit()
+    db.commit()
     return get_entry(entry_id)
 
 
