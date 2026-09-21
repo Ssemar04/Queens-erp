@@ -57,6 +57,7 @@ import type { Item } from "@/types/inventory";
 import type { OrderItem, OrderStatus, QuotationAttachment, SalesOrder } from "@/types/sales-order";
 import type { Employee } from "@/components/employees/employees-store";
 import { useRole } from "@/hooks/useRole";
+import { useBranch } from "@/contexts/BranchContext";
 
 export const Route = createFileRoute("/app/orders")({
   component: OrdersPage,
@@ -83,6 +84,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 
 function OrdersPage() {
   const { isAdmin } = useRole();
+  const { currentBranchId } = useBranch();
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -147,6 +149,15 @@ function OrdersPage() {
     const value = orders.reduce((s, o) => s + (o.amount || 0), 0);
     return { total, pending, delivered, value };
   }, [orders]);
+
+  const branchScopedEmployees = useMemo(() => {
+    return employees.filter((e) => {
+      const statusOk = !e.status || e.status.toLowerCase() === "active" || e.status.toLowerCase() === "probation";
+      if (!statusOk) return false;
+      if (!currentBranchId) return true;
+      return e.branchId === currentBranchId || !e.branchId;
+    });
+  }, [employees, currentBranchId]);
 
   async function handleCreate(order: SalesOrder) {
     setSaving(true);
@@ -342,7 +353,7 @@ function OrdersPage() {
                           </span>
                         </SelectTrigger>
                         <SelectContent>
-                          {employees.map((emp) => (
+                          {branchScopedEmployees.map((emp) => (
                             <SelectItem key={emp.id} value={emp.name}>
                               <div className="flex items-center gap-2">
                                 <span>{emp.name}</span>
@@ -350,7 +361,7 @@ function OrdersPage() {
                               </div>
                             </SelectItem>
                           ))}
-                          {o.handledBy && !employees.some((e) => e.name === o.handledBy) && (
+                          {o.handledBy && !branchScopedEmployees.some((e) => e.name === o.handledBy) && (
                             <SelectItem value={o.handledBy}>{o.handledBy}</SelectItem>
                           )}
                         </SelectContent>
@@ -406,7 +417,7 @@ function OrdersPage() {
         nextLpo={nextLpo(orders)}
         onCreate={handleCreate}
         submitting={saving}
-        employees={employees}
+        employees={branchScopedEmployees}
         customers={customers}
         inventoryItems={inventoryItems}
       />

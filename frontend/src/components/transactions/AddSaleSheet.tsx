@@ -30,6 +30,7 @@ import { useEmployees } from "@/components/employees/employees-store";
 import { useAssetsStore } from "@/components/assets/assets-store";
 import { useCustomers, type Customer } from "@/components/customers/customers-store";
 import { useAuth } from "@/hooks/useAuth";
+import { useBranch } from "@/contexts/BranchContext";
 import { Badge } from "@/components/ui/badge";
 
 interface Props {
@@ -87,6 +88,7 @@ interface CartLineItem extends SaleItem {
 export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMovement, isSaving }: Props) {
   const { user } = useAuth();
   const { employees } = useEmployees();
+  const { currentBranchId } = useBranch();
   const assetsStore = useAssetsStore();
   const { customers, loading: customersLoading } = useCustomers();
 
@@ -112,9 +114,14 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
 
   const selected = items.find((i) => i.id === itemId);
   const activeStaff = useMemo(() => {
-    const list = employees.filter((e) => !e.status || e.status.toLowerCase() === "active" || e.status.toLowerCase() === "probation");
+    const list = employees.filter((e) => {
+      const statusOk = !e.status || e.status.toLowerCase() === "active" || e.status.toLowerCase() === "probation";
+      if (!statusOk) return false;
+      if (!currentBranchId) return true;
+      return e.branchId === currentBranchId || !e.branchId;
+    });
     return list;
-  }, [employees]);
+  }, [employees, currentBranchId]);
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) ?? null;
 
   useEffect(() => {
@@ -141,7 +148,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       setLineItems([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, currentBranchId]);
 
   useEffect(() => {
     if (selected) setUnitPrice(String(selected.sellingPrice));
