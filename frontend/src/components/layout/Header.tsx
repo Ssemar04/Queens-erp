@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Search, Plus, Menu, User, LogOut, Settings, ChevronDown, ScanBarcode, Command, KeyRound, AlertCircle, Building2, Check } from "lucide-react";
+import { Search, Plus, Menu, User, LogOut, Settings, ChevronDown, ScanBarcode, Command, KeyRound, AlertCircle, Building2, Check, Lock } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
 import { Button } from "@/components/ui/button";
@@ -185,23 +185,52 @@ function BranchSwitcher() {
 
   if (isLocked) {
     return (
-      <Badge variant="outline" className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs border-primary/30 bg-primary/5 text-primary">
-        <Building2 className="h-3.5 w-3.5" />
-        <span className="font-medium max-w-[120px] truncate">{selectedBranch?.name || "Assigned Branch"}</span>
-      </Badge>
+      <Tooltip delayDuration={200}>
+        <TooltipTrigger asChild>
+          <Badge
+            variant="outline"
+            className="group hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs border-[#003399]/30 bg-[#003399]/[0.04] text-[#003399] cursor-default transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-[#003399]/50 hover:bg-[#003399]/[0.08] hover:shadow-[0_0_0_1px_rgba(0,51,153,0.08),0_0_18px_-4px_rgba(0,51,153,0.25)]"
+          >
+            <span className="relative inline-flex">
+              <Building2 className="h-3.5 w-3.5" />
+              <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-[#003399] shadow-[0_0_0_2px_rgba(255,255,255,0.95)] animate-pulse" style={{ animationDuration: "2.4s" }} />
+            </span>
+            <span className="font-medium max-w-[120px] truncate">{selectedBranch?.name || "Assigned Branch"}</span>
+            <Lock className="h-3 w-3 opacity-70 shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-110" />
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          align="end"
+          className="max-w-[260px] text-xs border-[#003399]/20 bg-white shadow-[0_10px_40px_-10px_rgba(0,51,153,0.3)] dark:bg-zinc-950"
+        >
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 font-semibold text-[#003399]">
+              <Lock className="h-3.5 w-3.5" />
+              <span>Branch Context Locked</span>
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              Your account is restricted to the <span className="font-medium text-foreground">{selectedBranch?.name || "assigned branch"}</span> sub-database.
+            </p>
+            <p className="text-muted-foreground/90 leading-relaxed">
+              Only Admin users can switch between branch sub-databases. Contact your administrator to request a context change.
+            </p>
+          </div>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium border-border hover:bg-muted">
+        <Button variant="outline" size="sm" className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium border-border hover:bg-muted transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-primary/30 hover:shadow-[0_0_0_1px_rgba(0,51,153,0.06)]">
           <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
           <span className="max-w-[120px] truncate">{selectedBranch?.name || "Select Branch"}</span>
-          <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+          <ChevronDown className="h-3 w-3 opacity-60 ml-0.5 transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:rotate-180" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-56 shadow-[0_10px_40px_-12px_rgba(0,51,153,0.2)]">
         <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Company Branches (Sub-DB)</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {branches.map((b) => {
@@ -213,13 +242,13 @@ function BranchSwitcher() {
                 switchBranch(b.id);
                 toast.success(`Switched active database context to ${b.name}`);
               }}
-              className="flex items-center justify-between text-xs cursor-pointer"
+              className="flex items-center justify-between text-xs cursor-pointer transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[#003399]/5"
             >
               <div className="flex items-center gap-2 truncate">
-                <Building2 className={`h-4 w-4 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                <Building2 className={`h-4 w-4 ${isSelected ? "text-[#003399]" : "text-muted-foreground"}`} />
                 <span className={isSelected ? "font-semibold text-foreground" : "text-muted-foreground"}>{b.name}</span>
               </div>
-              {isSelected && <Check className="h-4 w-4 text-primary ml-2 shrink-0" />}
+              {isSelected && <Check className="h-4 w-4 text-[#003399] ml-2 shrink-0" />}
             </DropdownMenuItem>
           );
         })}

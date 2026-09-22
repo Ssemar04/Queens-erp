@@ -9,7 +9,7 @@ from models.serializers import (
     branch_from_row,
     supplier_from_row,
 )
-from routes.guards import require_current_user
+from routes.guards import require_current_user, require_admin_user
 from services import catalog_service
 
 catalog_bp = Blueprint("catalog", __name__)
@@ -320,7 +320,7 @@ def get_branch(branch_id):
 
 @catalog_bp.route("/api/locations", methods=["POST"])
 def create_location():
-    _, auth_error = require_current_user()
+    _, auth_error = require_admin_user()
     if auth_error:
         return auth_error
 
@@ -345,7 +345,7 @@ def create_location():
 
 @catalog_bp.route("/api/branches", methods=["POST"])
 def create_branch():
-    _, auth_error = require_current_user()
+    _, auth_error = require_admin_user()
     if auth_error:
         return auth_error
 
@@ -369,7 +369,7 @@ def create_branch():
 
 @catalog_bp.route("/api/locations/<location_id>", methods=["PATCH"])
 def update_location(location_id):
-    _, auth_error = require_current_user()
+    _, auth_error = require_admin_user()
     if auth_error:
         return auth_error
 
@@ -389,7 +389,7 @@ def update_location(location_id):
 
 @catalog_bp.route("/api/branches/<branch_id>", methods=["PATCH"])
 def update_branch(branch_id):
-    _, auth_error = require_current_user()
+    _, auth_error = require_admin_user()
     if auth_error:
         return auth_error
 
@@ -408,7 +408,7 @@ def update_branch(branch_id):
 
 @catalog_bp.route("/api/locations/<location_id>", methods=["DELETE"])
 def delete_location(location_id):
-    _, auth_error = require_current_user()
+    _, auth_error = require_admin_user()
     if auth_error:
         return auth_error
 
@@ -420,7 +420,7 @@ def delete_location(location_id):
 
 @catalog_bp.route("/api/branches/<branch_id>", methods=["DELETE"])
 def delete_branch(branch_id):
-    _, auth_error = require_current_user()
+    _, auth_error = require_admin_user()
     if auth_error:
         return auth_error
 

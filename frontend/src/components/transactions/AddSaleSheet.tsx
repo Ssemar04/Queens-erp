@@ -124,6 +124,22 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
   }, [employees, currentBranchId]);
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) ?? null;
 
+  const authenticatedUserName = useMemo(() => {
+    const fullName = (user?.user_metadata?.full_name as string) || "";
+    const emailPrefix = (user?.email?.split("@")[0]) || "";
+    const authEmail = user?.email || "";
+    const authUser: typeof employees[number] | undefined = employees.find((e) => {
+      const eEmail = (e.email || "").toLowerCase().trim();
+      const authEm = authEmail.toLowerCase().trim();
+      const eName = (e.name || "").toLowerCase().trim();
+      const fName = fullName.toLowerCase().trim();
+      if (authEm && eEmail && eEmail === authEm) return true;
+      if (fName && eName && (eName === fName || eName.includes(fName) || fName.includes(eName))) return true;
+      return false;
+    });
+    return authUser?.name || fullName || emailPrefix || "";
+  }, [employees, user]);
+
   useEffect(() => {
     if (open) {
       setItemId("");
@@ -137,8 +153,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       setPaymentMethod("cash");
       setAmountTendered("0");
       setIsCustomTendered(false);
-      const userName = (user?.user_metadata?.full_name as string) || (user?.email?.split("@")[0]) || "";
-      setStaff(activeStaff[0]?.name ?? userName ?? "");
+      setStaff(authenticatedUserName || activeStaff[0]?.name || "");
       setSelectedCustomerId(null);
       setCustomerFocused(false);
       setCustomer("");
@@ -148,7 +163,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       setLineItems([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, currentBranchId]);
+  }, [open, currentBranchId, authenticatedUserName]);
 
   useEffect(() => {
     if (selected) setUnitPrice(String(selected.sellingPrice));

@@ -10,6 +10,7 @@ interface LocationSummaryProps {
   branch: Location;
   items: Item[];
   onEdit: () => void;
+  canEdit?: boolean;
 }
 
 function formatAddress(branch: Location) {
@@ -20,7 +21,7 @@ function formatAddress(branch: Location) {
   return address || (typeof branch.address === "string" ? branch.address.trim() : "");
 }
 
-export function LocationSummary({ branch, items, onEdit }: LocationSummaryProps) {
+export function LocationSummary({ branch, items, onEdit, canEdit = true }: LocationSummaryProps) {
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<BranchDashboardStats>({
     queryKey: ["branch-dashboard", branch.id],
     queryFn: () => getBranchDashboard(branch.id),
@@ -60,10 +61,12 @@ export function LocationSummary({ branch, items, onEdit }: LocationSummaryProps)
               {formattedAddress || "Address details not set yet"}
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={onEdit}>
-            <Edit2 className="mr-1.5 h-4 w-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={onEdit}>
+              <Edit2 className="mr-1.5 h-4 w-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </div>
 

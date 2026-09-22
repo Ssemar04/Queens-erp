@@ -36,10 +36,10 @@ def _parse_date(value):
         return None
     try:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date()
-    except ValueError:
+    except (ValueError, TypeError, AttributeError):
         try:
             return date.fromisoformat(str(value)[:10])
-        except ValueError:
+        except (ValueError, TypeError, AttributeError):
             return None
 
 

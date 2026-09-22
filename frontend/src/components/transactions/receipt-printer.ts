@@ -194,7 +194,6 @@ export function printReceipt(
 ) {
   const effectiveCompany = getBranchReceiptCompanyDetails(company, branch);
   const r = getReceiptSummary(t, itemNameMap);
-  const printedAt = format(new Date(), "dd/MM/yyyy HH:mm");
   const soldAt = format(new Date(r.time), "dd/MM/yyyy HH:mm");
   const popup = window.open("", "_blank", "width=420,height=720");
   if (!popup) return;
@@ -221,49 +220,53 @@ export function printReceipt(
     <!doctype html>
     <html>
       <head>
-        <title>Queenstech Receipt - ${escapeHtml(r.receipt)}</title>
+        <title>Receipt - ${escapeHtml(r.receipt)}</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
           * { box-sizing: border-box; }
-          :root { --brand: #003399; --brand-soft: rgba(0,51,153,0.08); --brand-line: rgba(0,51,153,0.25); }
+          :root { --ink: #000; --ink-soft: #1a1a1a; --ink-line: #000; --ink-rule: #1a1a1a; }
           body {
             margin: 0;
-            background: #f5f5f4;
-            color: #111;
+            background: #fff;
+            color: var(--ink);
             font-family: "Arial Narrow", Arial, sans-serif;
             font-size: 11px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .receipt {
             width: 80mm;
             max-width: 80mm;
-            margin: 18px auto;
+            margin: 0 auto;
             background: #fff;
+            color: var(--ink);
             padding: 5mm 4mm 7mm;
-            box-shadow: 0 12px 34px rgba(0,0,0,.16), 0 0 0 1px var(--brand-line);
-            border-radius: 2px;
+            border: 1px solid #ddd;
           }
           .center { text-align: center; }
           .header-band {
             margin: -5mm -4mm 4mm;
             padding: 4mm 4mm 3.5mm;
-            background: linear-gradient(135deg, var(--brand) 0%, #0042b3 100%);
-            color: #fff;
-            border-bottom: 2px solid var(--brand);
+            background: #fff;
+            color: var(--ink);
+            border-bottom: 2px solid var(--ink-line);
+            text-align: center;
           }
-          .company { margin: 0; font-size: 16px; line-height: 1.08; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; }
-          .header-band .subtle { color: rgba(255,255,255,0.82); }
-          .muted { color: #444; }
-          .subtle { color: #555; font-size: 10px; line-height: 1.25; }
-          .rule-dash { border-top: 1px dashed #999; margin: 7px 0; }
-          .rule-brand { border-top: 1px solid var(--brand-line); margin: 8px 0; }
-          .rule-thick { border-top: 2px solid var(--brand); margin: 4px 0; }
-          .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+          .company { margin: 0; font-size: 16px; line-height: 1.08; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; color: var(--ink); }
+          .header-band .subtle { color: var(--ink-soft); font-size: 10px; }
+          .muted { color: var(--ink-soft); }
+          .subtle { color: var(--ink-soft); font-size: 10px; line-height: 1.25; }
+          .rule-dash { border-top: 1px dashed var(--ink-rule); margin: 7px 0; }
+          .rule-brand { border-top: 1px solid var(--ink-rule); margin: 8px 0; }
+          .rule-thick { border-top: 2px solid var(--ink-line); margin: 4px 0; }
+          .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink); }
           .receipt-id {
             margin-top: 4px; font-size: 12px; font-weight: 700;
             display: inline-block; padding: 2px 8px;
-            background: rgba(255,255,255,0.15);
-            border: 1px solid rgba(255,255,255,0.25);
+            background: #fff;
+            border: 1px solid var(--ink-line);
             border-radius: 3px;
+            color: var(--ink);
           }
           .row, .item {
             display: grid;
@@ -271,37 +274,42 @@ export function printReceipt(
             gap: 6px;
             align-items: start;
             padding: 2px 0;
+            color: var(--ink);
           }
+          .row strong { color: var(--ink); font-weight: 700; }
           .particulars-head {
             margin: 2px 0 4px;
             display: flex; align-items: center; justify-content: space-between;
             padding: 3px 0;
-            border-top: 1px solid var(--brand-line);
-            border-bottom: 1px solid var(--brand-line);
-            background: var(--brand-soft);
+            border-top: 1px solid var(--ink-rule);
+            border-bottom: 1px solid var(--ink-rule);
+            background: #fff;
           }
           .particulars-title {
             font-size: 10px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;
-            color: var(--brand);
+            color: var(--ink);
             padding: 0 4px;
           }
           .particulars-count {
-            font-size: 9px; color: var(--brand); opacity: 0.75;
+            font-size: 9px; color: var(--ink); opacity: 0.8;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             padding: 0 4px;
           }
-          .item { grid-template-columns: 1fr 44px 58px; border-bottom: 1px dotted #bbb; padding: 4px 0; }
-          .item-name { min-width: 0; font-weight: 700; overflow-wrap: anywhere; color: #111; }
-          .item-meta { text-align: right; white-space: nowrap; color: #555; }
-          .item-amount { text-align: right; font-weight: 700; white-space: nowrap; color: var(--brand); }
-          .total { border-top: 2px solid var(--brand); border-bottom: 3px double var(--brand); margin-top: 3px; padding: 5px 0; font-size: 14px; font-weight: 800; color: var(--brand); background: var(--brand-soft); }
-          .barcode { margin-top: 10px; text-align: center; padding: 4px 2px; border-top: 1px solid var(--brand-line); }
+          .item { grid-template-columns: 1fr 44px 58px; border-bottom: 1px dotted var(--ink-rule); padding: 4px 0; }
+          .item-name { min-width: 0; font-weight: 700; overflow-wrap: anywhere; color: var(--ink); }
+          .item-meta { text-align: right; white-space: nowrap; color: var(--ink-soft); }
+          .item-amount { text-align: right; font-weight: 700; white-space: nowrap; color: var(--ink); }
+          .total { border-top: 2px solid var(--ink-line); border-bottom: 3px double var(--ink-line); margin-top: 3px; padding: 5px 0; font-size: 14px; font-weight: 800; color: var(--ink); background: #fff; }
+          .total span { color: var(--ink); font-weight: 800; }
+          .barcode { margin-top: 10px; text-align: center; padding: 4px 2px; border-top: 1px solid var(--ink-rule); }
           .barcode svg { width: 68mm; max-width: 100%; height: 14mm; }
-          .verify { margin-top: 3px; font-size: 9px; line-height: 1.25; overflow-wrap: anywhere; color: #666; }
-          .slogan { margin: 8px 0 0; font-weight: 800; text-transform: uppercase; color: var(--brand); letter-spacing: 0.3px; }
+          .barcode svg rect { fill: #000; }
+          .verify { margin-top: 3px; font-size: 9px; line-height: 1.25; overflow-wrap: anywhere; color: var(--ink-soft); }
+          .slogan { margin: 8px 0 0; font-weight: 800; text-transform: uppercase; color: var(--ink); letter-spacing: 0.3px; }
           @media print {
             body { background: #fff; }
-            .receipt { margin: 0; width: 80mm; max-width: 80mm; box-shadow: none; border-radius: 0; }
+            .receipt { margin: 0; width: 80mm; max-width: 80mm; box-shadow: none; border-radius: 0; border: none; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
         </style>
       </head>
@@ -316,8 +324,7 @@ export function printReceipt(
           </header>
 
           <div class="rule-dash"></div>
-          <div class="row"><span class="muted">Served</span><strong>${escapeHtml(soldAt)}</strong></div>
-          <div class="row"><span class="muted">Printed</span><strong>${escapeHtml(printedAt)}</strong></div>
+          <div class="row"><span class="muted">Date</span><strong>${escapeHtml(soldAt)}</strong></div>
           <div class="row"><span class="muted">Customer</span><strong>${escapeHtml(r.customer)}</strong></div>
           <div class="row"><span class="muted">Staff</span><strong>${escapeHtml(getLastName(r.staff))}</strong></div>
 
@@ -329,10 +336,10 @@ export function printReceipt(
 
           <div class="rule-brand"></div>
           <div class="row"><span class="muted">Subtotal</span><strong>${escapeHtml(fmtMoney(subtotal))}</strong></div>
-          ${totalDiscount > 0 ? `<div class="row"><span class="muted">Discount</span><strong style="color:#16a34a">${escapeHtml(fmtMoney(totalDiscount))}</strong></div>` : ""}
+          ${totalDiscount > 0 ? `<div class="row"><span class="muted">Discount</span><strong>${escapeHtml(fmtMoney(totalDiscount))}</strong></div>` : ""}
           ${totalVat > 0 ? `<div class="row"><span class="muted">VAT</span><strong>${escapeHtml(fmtMoney(totalVat))}</strong></div>` : ""}
           <div class="row total"><span>Total</span><span>${escapeHtml(fmtMoney(r.total))}</span></div>
-          <div class="row"><span class="muted">Balance</span><strong style="color:var(--brand)">${escapeHtml(fmtMoney(r.balance))}</strong></div>
+          <div class="row"><span class="muted">Balance</span><strong>${escapeHtml(fmtMoney(r.balance))}</strong></div>
           <div class="row"><span class="muted">Payment</span><strong>${escapeHtml(METHOD_LABEL[r.method] ?? r.method)}</strong></div>
 
           <footer class="center">

@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getBranches, getStoredActiveBranch, setStoredActiveBranch } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import type { Location } from "@/types/inventory";
+import { Lock } from "lucide-react";
+import { toast } from "sonner";
 
 interface BranchContextType {
   currentBranchId: string | null;
@@ -10,6 +12,7 @@ interface BranchContextType {
   selectedBranch: Location | null;
   switchBranch: (branchId: string) => void;
   isLocked: boolean;
+  isAdmin: boolean;
   isLoading: boolean;
   refreshBranches: () => Promise<void>;
 }
@@ -20,6 +23,7 @@ const BranchContext = createContext<BranchContextType>({
   selectedBranch: null,
   switchBranch: () => {},
   isLocked: false,
+  isAdmin: false,
   isLoading: true,
   refreshBranches: async () => {},
 });
@@ -35,7 +39,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   const appRole = (user?.user_metadata?.role || userExtra?.role)?.toLowerCase();
   const isAdmin = appRole === "admin";
   const userAssignedBranchId = user?.user_metadata?.branchId || userExtra?.branchId || null;
-  const isLocked = !isAdmin && Boolean(userAssignedBranchId);
+  const isLocked = !isAdmin;
 
   const refreshBranches = useCallback(async () => {
     try {
@@ -44,12 +48,13 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       setBranches(data);
 
       if (data.length > 0) {
-        // If employee locked to a branch:
-        if (isLocked && userAssignedBranchId) {
-          setCurrentBranchId(userAssignedBranchId);
-          setStoredActiveBranch(userAssignedBranchId);
+        if (isLocked) {
+          const pinnedId = userAssignedBranchId && data.some((b) => b.id === userAssignedBranchId)
+            ? userAssignedBranchId
+            : data[0].id;
+          setCurrentBranchId(pinnedId);
+          setStoredActiveBranch(pinnedId);
         } else {
-          // If stored active branch is valid, keep it; otherwise default to first branch
           const stored = getStoredActiveBranch();
           const valid = stored && data.some((b) => b.id === stored);
           const targetId = valid ? stored : data[0].id;
@@ -70,22 +75,27 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
   const switchBranch = useCallback(
     (branchId: string) => {
-      if (isLocked) {
-        console.warn("Branch switching is restricted for assigned employees.");
+      if (!isAdmin) {
+        toast.error("Branch switching is restricted to Admin users.", {
+          description: "Contact an administrator to change your active sub-database context.",
+          icon: <Lock className="h-4 w-4" />,
+          classNames: {
+            toast: "group-[.toaster]:border-rose-200",
+          },
+        });
         return;
       }
+
       setCurrentBranchId(branchId);
       setStoredActiveBranch(branchId);
 
-      // Instantly clear/reset query cache so no stale branch data persists in React Query
       queryClient.clear();
       queryClient.resetQueries();
       queryClient.invalidateQueries();
 
-      // Dispatch global event for non-react-query stores to re-fetch immediately
       window.dispatchEvent(new CustomEvent("qterp:branch-changed", { detail: { branchId } }));
     },
-    [isLocked, queryClient],
+    [isAdmin, queryClient],
   );
 
   const selectedBranch = useMemo(
@@ -101,6 +111,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         selectedBranch,
         switchBranch,
         isLocked,
+        isAdmin,
         isLoading,
         refreshBranches,
       }}

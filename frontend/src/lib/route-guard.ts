@@ -17,7 +17,7 @@ const ROUTE_ACCESS: Record<string, UserRoleType[]> = {
   "/app/suppliers": ["admin", "manager"], // Supplies / Suppliers
   "/app/help": ["admin", "manager", "staff"], // Help
   "/app/employees": ["admin"], // Employees (Admin only)
-  "/app/locations": ["admin"], // Branches (Admin only)
+  "/app/locations": ["admin", "manager"], // Branches (Admin + Branch Managers read-only view)
   "/app/settings": ["admin"], // System Settings (Admin only)
 };
 

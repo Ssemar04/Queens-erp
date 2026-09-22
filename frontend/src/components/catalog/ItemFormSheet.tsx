@@ -360,15 +360,6 @@ export function ItemFormSheet({
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <label className={labelCls}>Branch</label>
-              <Select value={watch("branchId") ?? ""} onValueChange={(v) => setValue("branchId", v || "")}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Select branch" /></SelectTrigger>
-                <SelectContent>
-                  {branches.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
           </fieldset>
 
           {/* Status */}

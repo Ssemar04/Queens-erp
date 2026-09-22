@@ -455,7 +455,7 @@ def sync_debtor_from_sale(sale, receipt_number, created_at, cust_id):
 
     try:
         dt_issue = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
+    except (ValueError, TypeError, AttributeError):
         dt_issue = datetime.now(timezone.utc)
 
     due_date = (dt_issue + timedelta(days=14)).date().isoformat()

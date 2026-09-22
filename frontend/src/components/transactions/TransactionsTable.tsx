@@ -308,7 +308,15 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
           {paged.map((t) => {
             const r = getReceiptSummary(t, itemNameMap);
             return (
-              <Card key={t.receiptNumber}>
+              <Card
+                key={t.receiptNumber}
+                className="cursor-pointer transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[inset_3px_0_0_rgba(0,51,153,0.5),0_4px_20px_-8px_rgba(0,0,0,0.1)] hover:border-[#003399]/30"
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest("button")) return;
+                  setReceiptTarget(t);
+                }}
+              >
                 <CardContent className="p-4 space-y-2">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
@@ -435,10 +443,20 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
             ) : paged.map((t) => {
               const r = getReceiptSummary(t, itemNameMap);
               return (
-                <TableRow key={t.receiptNumber} className="hover:bg-muted/40">
+                <TableRow
+                  key={t.receiptNumber}
+                  className="group hover:bg-muted/40 cursor-pointer transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[inset_2px_0_0_rgba(0,51,153,0.5)]"
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest("button") || target.closest('[role="menuitem"]') || target.closest('[data-dialog-close]')) {
+                      return;
+                    }
+                    setReceiptTarget(t);
+                  }}
+                >
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-md bg-primary/10 text-primary p-1">
+                      <span className="group-hover:bg-[#003399]/15 group-hover:text-[#003399] rounded-md bg-primary/10 text-primary p-1 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]">
                         <Receipt className="h-3.5 w-3.5" />
                       </span>
                       <div className="leading-tight">
@@ -489,10 +507,28 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity duration-200">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-[#003399] hover:bg-[#003399]/8"
+                        title="View receipt"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReceiptTarget(t);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Download receipt">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            title="Download receipt"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -508,7 +544,12 @@ export function TransactionsTable({ transactions, itemNameMap, initialQuery = ""
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>

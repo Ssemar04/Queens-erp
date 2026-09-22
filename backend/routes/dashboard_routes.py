@@ -19,7 +19,10 @@ def dashboard():
     if auth_error:
         return auth_error
 
-    return jsonify(get_dashboard_metrics())
+    try:
+        return jsonify(get_dashboard_metrics())
+    except Exception as e:
+        return jsonify({"error": f"Failed to load dashboard metrics: {str(e)}"}), 500
 
 
 @dashboard_bp.route("/api/dashboard/branch/<branch_id>")
@@ -28,4 +31,7 @@ def branch_dashboard(branch_id):
     if auth_error:
         return auth_error
 
-    return jsonify(get_branch_dashboard_stats(branch_id))
+    try:
+        return jsonify(get_branch_dashboard_stats(branch_id))
+    except Exception as e:
+        return jsonify({"error": f"Failed to load branch dashboard stats: {str(e)}"}), 500

@@ -185,7 +185,14 @@ def validate_expense_payload(data, partial=False):
     if data.get("categoryId") and not expenses_service.get_category(data["categoryId"]):
         return jsonify({"success": False, "message": "Category not found"}), 404
 
-    if not partial and float(data.get("amount") or 0) < 0:
+    if "amount" in data and data["amount"] is not None:
+        try:
+            val = float(data["amount"])
+            if val < 0:
+                return jsonify({"success": False, "message": "Expense amount must be positive"}), 400
+        except (ValueError, TypeError):
+            return jsonify({"success": False, "message": "Invalid expense amount"}), 400
+    elif not partial:
         return jsonify({"success": False, "message": "Expense amount must be positive"}), 400
 
     return None
