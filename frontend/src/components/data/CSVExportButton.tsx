@@ -12,6 +12,9 @@ interface CSVExportButtonProps<T> {
   columns: CSVColumn<T>[];
   filename: string;
   label?: string;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  size?: "default" | "sm" | "lg" | "icon";
+  className?: string;
 }
 
 function escapeCSV(value: string | number): string {
@@ -27,6 +30,9 @@ export function CSVExportButton<T>({
   columns,
   filename,
   label = "Export CSV",
+  variant = "outline",
+  size = "sm",
+  className,
 }: CSVExportButtonProps<T>) {
   const [loading, setLoading] = useState(false);
 
@@ -59,10 +65,11 @@ export function CSVExportButton<T>({
 
   return (
     <Button
-      variant="outline"
-      size="sm"
+      variant={variant}
+      size={size}
       onClick={handleExport}
       disabled={loading || data.length === 0}
+      className={className}
     >
       <Download className="mr-1.5 h-4 w-4" />
       {loading ? "Exporting…" : label}

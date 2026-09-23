@@ -538,30 +538,6 @@ function CatalogPage() {
 
   return (
     <div className="w-full min-w-0 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Inventory</h1>
-          <p className="text-sm text-muted-foreground">{items.length} items in stock</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <CSVExportButton
-            data={items}
-            columns={csvColumns}
-            filename="Queenstech ERP-items"
-          />
-          <PermissionGate permission="create_item">
-            <Button variant="outline" size="sm" className="hidden gap-1.5 sm:inline-flex" onClick={() => setImportOpen(true)}>
-              <Upload className="h-4 w-4" />Import
-            </Button>
-          </PermissionGate>
-          <PermissionGate permission="create_item">
-            <Button onClick={openCreate} className="hidden gap-1.5 sm:inline-flex">
-              <Plus className="h-4 w-4" />New Item
-            </Button>
-          </PermissionGate>
-        </div>
-      </div>
-
       {/* HERO / DASHBOARD BANNER */}
       <motion.section
         initial={{ opacity: 0, y: -6 }}
@@ -581,7 +557,7 @@ function CatalogPage() {
             </div>
           </div>
         </div>
-        <div className="relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium ring-1 ring-white/15 backdrop-blur">
               <Sparkles className="h-3.5 w-3.5" />
@@ -606,23 +582,45 @@ function CatalogPage() {
               )}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 pt-2 md:pt-0">
+          <div className="flex flex-wrap items-center gap-2 pt-1 md:pt-0">
             <PermissionGate permission="create_item">
               <Button
                 onClick={openCreate}
                 size="sm"
-                className="bg-white text-[#003399] shadow-[0_0_0_1px_rgba(255,255,255,0.15),0_6px_20px_-4px_rgba(0,0,0,0.2)] hover:bg-white/90"
+                className="bg-white text-[#003399] font-semibold shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_4px_16px_-2px_rgba(0,0,0,0.25)] hover:bg-white/95 active:scale-[0.98] transition-all"
               >
-                <Plus className="mr-1.5 h-4 w-4" />
-                New item
+                <Plus className="mr-1.5 h-4 w-4 text-[#003399]" />
+                New Item
               </Button>
             </PermissionGate>
+
+            <PermissionGate permission="create_item">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setImportOpen(true)}
+                className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white backdrop-blur ring-1 ring-white/15 transition-all"
+              >
+                <Upload className="mr-1.5 h-4 w-4" />
+                Import
+              </Button>
+            </PermissionGate>
+
+            <CSVExportButton
+              data={items}
+              columns={csvColumns}
+              filename="Queenstech ERP-items"
+              variant="outline"
+              size="sm"
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white backdrop-blur ring-1 ring-white/15 transition-all"
+            />
+
             {isAdmin && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={openListCategories}
-                className="bg-white/10 text-white border-white/20 hover:bg-white/15 hover:text-white ring-1 ring-white/15"
+                className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white backdrop-blur ring-1 ring-white/15 transition-all"
               >
                 <Tag className="mr-1.5 h-4 w-4" />
                 Manage categories
