@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, Sparkles, Package, TrendingUp, AlertTriangle, TrendingDown, ShoppingCart, Tag, Pencil, Trash2, Archive, CheckCircle2, Boxes, Search as SearchIcon, Clock } from "lucide-react";
+import { Plus, Upload, Sparkles, Package, TrendingUp, AlertTriangle, TrendingDown, ShoppingCart, Tag, Pencil, Trash2, Archive, CheckCircle2, Boxes, Search as SearchIcon, Clock, Layers3, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -614,18 +614,6 @@ function CatalogPage() {
               size="sm"
               className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white backdrop-blur ring-1 ring-white/15 transition-all"
             />
-
-            {isAdmin && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={openListCategories}
-                className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white backdrop-blur ring-1 ring-white/15 transition-all"
-              >
-                <Tag className="mr-1.5 h-4 w-4" />
-                Manage categories
-              </Button>
-            )}
           </div>
         </div>
       </motion.section>
@@ -796,15 +784,15 @@ function CatalogPage() {
                 {categories.length} categor{categories.length === 1 ? "y" : "ies"}
               </h3>
             </div>
-            {isAdmin && (
+            {categories.length > 0 && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 onClick={openListCategories}
-                className="gap-1.5"
+                className="h-8 gap-1 text-xs text-[#003399] hover:bg-[#003399]/10 hover:text-[#003399] font-medium"
               >
-                <Pencil className="h-3.5 w-3.5" />
-                Manage
+                <Layers3 className="h-3.5 w-3.5" />
+                View all
               </Button>
             )}
           </div>
@@ -824,7 +812,7 @@ function CatalogPage() {
             <div className="space-y-2.5">
               {[...categories]
                 .sort((a, b) => (categoryUsageMap.get(b.id) || 0) - (categoryUsageMap.get(a.id) || 0))
-                .slice(0, 8)
+                .slice(0, 4)
                 .map((c, idx) => {
                   const count = categoryUsageMap.get(c.id) || 0;
                   const maxCount = Math.max(1, ...Array.from(categoryUsageMap.values()));
@@ -874,10 +862,23 @@ function CatalogPage() {
                     </motion.button>
                   );
                 })}
-              {categories.length > 8 && (
-                <p className="text-center text-[11px] text-muted-foreground pt-1">
-                  + {categories.length - 8} more categor{categories.length - 8 === 1 ? "y" : "ies"}
-                </p>
+              {categories.length > 4 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 2 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.28, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openListCategories}
+                    className="mt-1 w-full justify-center gap-1.5 border-dashed border-[#003399]/20 text-[#003399] hover:bg-[#003399]/5 hover:text-[#003399] hover:border-[#003399]/35"
+                  >
+                    <Layers3 className="h-3.5 w-3.5" />
+                    View all {categories.length} categories
+                    <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+                  </Button>
+                </motion.div>
               )}
             </div>
           )}
