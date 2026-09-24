@@ -183,7 +183,6 @@ export function CatalogTable({
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("sku")}>SKU<SortIcon col="sku" /></TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("categoryId")}>Category<SortIcon col="categoryId" /></TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("currentStock")}>Qty<SortIcon col="currentStock" /></TableHead>
-              <TableHead>Location</TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("supplierId")}>Supplier<SortIcon col="supplierId" /></TableHead>
               {actionRenderer && <TableHead className="w-12" />}
             </TableRow>
@@ -220,7 +219,6 @@ export function CatalogTable({
                     <StatusBadge status={stockStatus(item)} />
                   </span>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{locMap.get(item.locationId ?? "") ?? (item.locationId ? <span className="italic text-muted-foreground/60">Unknown Location</span> : "—")}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{supMap.get(item.supplierId ?? "") ?? (item.supplierId ? <span className="italic text-muted-foreground/60">Unknown Supplier</span> : "—")}</TableCell>
                 {actionRenderer && (
                   <TableCell onClick={(e) => e.stopPropagation()}>{actionRenderer(item)}</TableCell>

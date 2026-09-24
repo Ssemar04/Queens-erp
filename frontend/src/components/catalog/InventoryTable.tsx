@@ -35,8 +35,7 @@ interface Props {
 
 const PER_PAGE = 20;
 const fmt = (n: number) => n.toLocaleString();
-const money = (n: number) =>
-  n.toLocaleString(undefined, { style: "currency", currency: "UGX", maximumFractionDigits: 0 });
+const money = (n: number) => `UGX ${Math.round(n || 0).toLocaleString()}`;
 
 export function InventoryTable({
   items, movements, sort, onSortChange, selected, onSelectedChange,

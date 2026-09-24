@@ -101,14 +101,6 @@ export function CatalogFilters({ filters, onChange, categories, suppliers, branc
         </SelectContent>
       </Select>
 
-      <Select value={filters.branchId ?? "all"} onValueChange={(v) => update({ branchId: v === "all" ? undefined : v })}>
-        <SelectTrigger className="h-9 w-full sm:w-40"><SelectValue placeholder="Branch" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Branches</SelectItem>
-          {branches.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-        </SelectContent>
-      </Select>
-
       {activeCount > 0 && (
         <Button variant="ghost" size="sm" onClick={clear} className="gap-1 text-muted-foreground">
           <X className="h-3 w-3" />Clear Filters
