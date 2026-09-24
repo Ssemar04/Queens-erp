@@ -805,7 +805,7 @@ export const updateEmployeeAccount = async (
 ): Promise<EmployeeAccountUpdateResponse> => {
   const response = await api.patch(`/employees/${empId}/account`, updates);
   return response.data;
-    const response = await api.post("/documents", { ...payload, salesOrderId: targetId });
+};
 
 export const createEmployee = async (emp: EmployeeDraft): Promise<CreatedEmployeeResponse> => {
   const response = await api.post("/employees", emp);
