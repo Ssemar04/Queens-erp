@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Banknote, FileText, Smartphone, Search, Paperclip, Upload, Eye, X, Check } from "lucide-react";
+import { Plus, Banknote, FileText, Smartphone, Search, Paperclip, Upload, Eye, X, Check, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,9 @@ import { cn } from "@/lib/utils";
 import type { BankAccount, BankTxn, DepositType, WithdrawalType, MobileProvider, ReceiptAttachment } from "./bank-store";
 import { fmt } from "./bank-store";
 import { useCustomers, type Customer } from "@/components/customers/customers-store";
+import { useEmployees } from "@/components/employees/employees-store";
+import { useAuth } from "@/hooks/useAuth";
+import { useBranch } from "@/contexts/BranchContext";
 
 
 type Direction = "deposit" | "withdrawal";
@@ -111,6 +114,7 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd }: Props) {
               <TableHead>Type</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead>{isDeposit ? "From" : "To"}</TableHead>
+              <TableHead>Staff</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Account</TableHead>
               <TableHead>Receipt</TableHead>
@@ -132,6 +136,16 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd }: Props) {
                   </TableCell>
                   <TableCell className="font-mono text-xs">{t.reference}</TableCell>
                   <TableCell className="text-sm">{t.party}</TableCell>
+                  <TableCell className="text-xs">
+                    {t.performedBy ? (
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <User className="h-3 w-3" />
+                        {t.performedBy}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground/60">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="max-w-[260px] truncate text-sm text-muted-foreground">{t.description}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{acc?.accountName ?? "—"}</TableCell>
                   <TableCell>
@@ -156,7 +170,7 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd }: Props) {
               );
             })}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">No {isDeposit ? "deposits" : "withdrawals"} yet.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">No {isDeposit ? "deposits" : "withdrawals"} yet.</TableCell></TableRow>
             )}
           </TableBody>
 
@@ -284,6 +298,9 @@ function CashFlowSheet({
   const isDeposit = direction === "deposit";
   const types = isDeposit ? DEPOSIT_TYPES : WITHDRAWAL_TYPES;
   const { customers, loading: customersLoading } = useCustomers();
+  const { employees } = useEmployees();
+  const { user } = useAuth();
+  const { currentBranchId } = useBranch();
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [subtype, setSubtype] = useState<string>(types[0].value);
   const [reference, setReference] = useState("");
@@ -296,9 +313,36 @@ function CashFlowSheet({
   const [provider, setProvider] = useState<MobileProvider>(MOBILE_PROVIDERS[0]);
   const [attachment, setAttachment] = useState<ReceiptAttachment | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [staff, setStaff] = useState<string>("");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) ?? null;
+
+  const activeStaff = useMemo(() => {
+    const list = employees.filter((e) => {
+      const statusOk = !e.status || e.status.toLowerCase() === "active" || e.status.toLowerCase() === "probation";
+      if (!statusOk) return false;
+      if (!currentBranchId) return true;
+      return e.branchId === currentBranchId || !e.branchId;
+    });
+    return list;
+  }, [employees, currentBranchId]);
+
+  const authenticatedUserName = useMemo(() => {
+    const fullName = (user?.user_metadata?.full_name as string) || "";
+    const emailPrefix = (user?.email?.split("@")[0]) || "";
+    const authEmail = user?.email || "";
+    const authUser = employees.find((e) => {
+      const eEmail = (e.email || "").toLowerCase().trim();
+      const authEm = authEmail.toLowerCase().trim();
+      const eName = (e.name || "").toLowerCase().trim();
+      const fName = fullName.toLowerCase().trim();
+      if (authEm && eEmail && eEmail === authEm) return true;
+      if (fName && eName && (eName === fName || eName.includes(fName) || fName.includes(eName))) return true;
+      return false;
+    });
+    return authUser?.name || fullName || emailPrefix || "";
+  }, [employees, user]);
 
   const matchingCustomers = useMemo(() => {
     const query = compact(party);
@@ -335,7 +379,8 @@ function CashFlowSheet({
     setProvider(MOBILE_PROVIDERS[0]);
     setAttachment(null);
     setPreviewOpen(false);
-  }, [accounts, open, types]);
+    setStaff(authenticatedUserName || activeStaff[0]?.name || "");
+  }, [accounts, open, types, authenticatedUserName, activeStaff]);
 
   function selectCustomerProfile(profile: Customer) {
     setSelectedCustomerId(profile.id);
@@ -356,7 +401,7 @@ function CashFlowSheet({
     }
   }
 
-  const valid = accountId && reference && party && parseFloat(amount) > 0;
+  const valid = accountId && reference && party && parseFloat(amount) > 0 && staff.trim().length > 0;
 
   function handleFile(file: File | undefined) {
     if (!file) return;
@@ -495,6 +540,37 @@ function CashFlowSheet({
           </Field>
           <Field label="Description"><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Optional notes" /></Field>
 
+          <Field label="Staff member">
+            <Select value={staff} onValueChange={setStaff}>
+              <SelectTrigger className="w-full bg-white">
+                <SelectValue placeholder="Select staff" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeStaff.length > 0 ? activeStaff.map((e) => (
+                  <SelectItem key={e.id} value={e.name}>
+                    <span className="inline-flex items-center gap-2">
+                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      {e.name}
+                      <span className="text-[10px] text-muted-foreground">· {e.department || e.role}</span>
+                    </span>
+                  </SelectItem>
+                )) : (
+                  <SelectItem value={staff || "System"} disabled={false}>
+                    <span className="inline-flex items-center gap-2">
+                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      {staff || "System"}
+                    </span>
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {authenticatedUserName && staff !== authenticatedUserName && (
+              <p className="text-[11px] text-muted-foreground">
+                Signed in as <span className="font-medium text-foreground">{authenticatedUserName}</span>
+              </p>
+            )}
+          </Field>
+
           <Field label="Receipt (image or PDF)">
             <input
               ref={fileRef}
@@ -547,6 +623,7 @@ function CashFlowSheet({
                 customerId: selectedCustomerId ?? null,
                 mobileProvider: subtype === "mobile_money" ? provider : undefined,
                 attachment,
+                performedBy: staff.trim(),
               });
               setPreviewOpen(false);
               setAttachment(null);

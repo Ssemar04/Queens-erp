@@ -160,9 +160,9 @@ def create_transaction(data):
         """
         INSERT INTO bank_transactions (
             id, account_id, date, txn_type, subtype, reference, description, amount,
-            party, mobile_provider, reconciled, attachment, created_at, updated_at
+            party, mobile_provider, reconciled, attachment, performed_by, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             data["id"],
@@ -177,6 +177,7 @@ def create_transaction(data):
             data.get("mobileProvider"),
             1 if data.get("reconciled") else 0,
             json.dumps(attachment) if attachment else None,
+            data.get("performedBy") or "",
             created_at,
             data.get("updatedAt") or created_at,
         ),
@@ -214,7 +215,7 @@ def create_transaction(data):
                     "deposit",
                     f"Deposit of {amount:.2f} recorded via bank entry for {party or 'customer'}",
                     created_at,
-                    "system",
+                    data.get("performedBy") or "system",
                 ),
             )
 

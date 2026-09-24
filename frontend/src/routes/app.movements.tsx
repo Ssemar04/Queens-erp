@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Receipt } from "lucide-react";
+import { Plus, Receipt, Sparkles, TrendingUp, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { TransactionsTable } from "@/components/transactions/TransactionsTable";
 import { AddSaleSheet } from "@/components/transactions/AddSaleSheet";
@@ -218,25 +219,69 @@ function TransactionsPage() {
     [queryClient],
   );
 
+  const newThisWeek = useMemo(() => {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const iso = weekAgo.toISOString().slice(0, 10);
+    return transactions.filter((t) => (t.createdAt || "").slice(0, 10) >= iso).length;
+  }, [transactions]);
+
+  const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
+
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Transactions</h1>
-          <p className="text-sm text-muted-foreground">
-            {stats.count} {stats.count === 1 ? "sale" : "sales"} recorded
-          </p>
+      <motion.section
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.02 * sectionIndex("hero"), duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+        className="relative overflow-hidden rounded-2xl border border-[#003399]/15 bg-gradient-to-br from-[#003399] via-[#003399] to-[#004CCC] text-white p-6 shadow-[0_10px_40px_-18px_rgba(0,51,153,0.45)]"
+      >
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+        <div className="absolute -left-24 -bottom-28 h-72 w-72 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+        <div className="absolute right-6 top-1/2 hidden md:block -translate-y-1/2 pointer-events-none">
+          <div className="relative">
+            <div className="h-20 w-20 rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.06)] -rotate-3">
+              <Receipt className="h-10 w-10 text-white" />
+            </div>
+            <div className="absolute -bottom-2 -right-3 h-8 w-8 rounded-xl bg-emerald-400/90 text-[#111] flex items-center justify-center shadow-lg">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <CSVExportButton data={transactions} columns={csvColumns} filename="Queenstech ERP-transactions" />
-          <PermissionGate permission="log_movement">
-            <Button onClick={() => setFormOpen(true)} className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              Add sale
-            </Button>
-          </PermissionGate>
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium ring-1 ring-white/15 backdrop-blur">
+              <Sparkles className="h-3.5 w-3.5" />
+              Transactions hub
+              {newThisWeek > 0 && (
+                <span className="ml-1 rounded-full bg-emerald-400/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-200 ring-1 ring-emerald-300/30">
+                  +{newThisWeek} this week
+                </span>
+              )}
+            </div>
+            <h2 className="text-2xl font-bold leading-tight md:text-[28px]">
+              {stats.count.toLocaleString()} sales · {fmt(stats.total)} gross
+            </h2>
+            <p className="max-w-2xl text-sm text-white/80 leading-relaxed">
+              {stats.count.toLocaleString()} receipts recorded
+              {stats.outstanding > 0 && <> · <span className="font-semibold text-amber-200">{fmt(stats.outstanding)} outstanding</span></>}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1 md:pt-0">
+            <CSVExportButton data={transactions} columns={csvColumns} filename="Queenstech ERP-transactions" />
+            <PermissionGate permission="log_movement">
+              <Button
+                onClick={() => setFormOpen(true)}
+                size="sm"
+                className="bg-white text-[#003399] font-semibold shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_4px_16px_-2px_rgba(0,0,0,0.25)] hover:bg-white/95 active:scale-[0.98] transition-all gap-1.5"
+              >
+                <Plus className="h-4 w-4 text-[#003399]" />
+                Add sale
+              </Button>
+            </PermissionGate>
+          </div>
         </div>
-      </div>
+      </motion.section>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {statPills.map((s) => (

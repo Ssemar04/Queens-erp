@@ -398,6 +398,13 @@ def bank_transaction_from_row(row):
         except json.JSONDecodeError:
             attachment = None
 
+    def get(col, default=None):
+        try:
+            val = row[col]
+            return val if val is not None else default
+        except (KeyError, IndexError):
+            return default
+
     return {
         "id": row["id"],
         "accountId": row["account_id"],
@@ -411,6 +418,7 @@ def bank_transaction_from_row(row):
         "mobileProvider": row["mobile_provider"],
         "reconciled": bool(row["reconciled"]),
         "attachment": attachment if isinstance(attachment, dict) else None,
+        "performedBy": get("performed_by", "") or "",
         "createdAt": row["created_at"],
     }
 

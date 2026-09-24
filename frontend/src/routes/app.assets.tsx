@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Boxes, Plus, Search, Gauge, Wrench, AlertTriangle, TrendingDown, Activity } from "lucide-react";
+import { Boxes, Plus, Search, Gauge, Wrench, AlertTriangle, TrendingDown, Activity, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 import { useAssetsStore, bookValue, currentMeter, serviceHealth, nextServiceDueDate, fmtKES, CATEGORY_COLOR, type Asset } from "@/components/assets/assets-store";
 import { AssetFormSheet } from "@/components/assets/AssetFormSheet";
 import { AssetDetailSheet } from "@/components/assets/AssetDetailSheet";
@@ -33,18 +34,23 @@ function AssetsPage() {
     if (status !== "all" && a.status !== status) return false;
     if (q.trim()) {
       const s = q.toLowerCase();
-      return [a.name, a.tag, a.serialNumber, a.manufacturer, a.model, a.assignedTo, a.location].some((v) => v.toLowerCase().includes(s));
+      return [a.name, a.tag, a.serialNumber, a.manufacturer, a.model, a.staff, a.assignedTo, a.location]
+        .filter((v): v is string => Boolean(v))
+        .some((v) => v.toLowerCase().includes(s));
     }
     return true;
   }), [store.assets, q, cat, status]);
 
   if (!store.ready) return <div className="w-full h-32 animate-pulse rounded-xl bg-muted/50" />;
 
+  const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
+
   // KPI rollups
   const totalValue = store.assets.reduce((s, a) => s + a.purchaseCost, 0);
   const bookSum = store.assets.reduce((s, a) => s + bookValue(a), 0);
   const dueSoon = store.assets.filter((a) => ["due_soon", "overdue"].includes(serviceHealth(a).state));
   const inMaint = store.assets.filter((a) => a.status === "maintenance").length;
+  const activeCount = store.assets.filter((a) => a.status === "active").length;
 
   // upcoming services
   const upcoming = store.assets
@@ -61,18 +67,50 @@ function AssetsPage() {
 
   return (
     <div className="w-full min-w-0 space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-sm">
-            <Boxes className="h-5 w-5" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold">Assets</h1>
-            <p className="text-sm text-muted-foreground">Track meter readings, schedule services, monitor depreciation</p>
+      <motion.section
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.02 * sectionIndex("hero"), duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+        className="relative overflow-hidden rounded-2xl border border-[#003399]/15 bg-gradient-to-br from-[#003399] via-[#003399] to-[#004CCC] text-white p-6 shadow-[0_10px_40px_-18px_rgba(0,51,153,0.45)]"
+      >
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+        <div className="absolute -left-24 -bottom-28 h-72 w-72 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+        <div className="absolute right-6 top-1/2 hidden md:block -translate-y-1/2 pointer-events-none">
+          <div className="relative">
+            <div className="h-20 w-20 rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.06)] -rotate-3">
+              <Boxes className="h-10 w-10 text-white" />
+            </div>
+            <div className="absolute -bottom-2 -right-3 h-8 w-8 rounded-xl bg-orange-400/90 text-[#111] flex items-center justify-center shadow-lg">
+              <Wrench className="h-4 w-4" />
+            </div>
           </div>
         </div>
-        <Button onClick={() => { setEditing(null); setShowForm(true); }}><Plus className="mr-1.5 h-4 w-4" /> New asset</Button>
-      </div>
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium ring-1 ring-white/15 backdrop-blur">
+              <Sparkles className="h-3.5 w-3.5" />
+              Assets hub
+            </div>
+            <h2 className="text-2xl font-bold leading-tight md:text-[28px]">
+              {store.assets.length.toLocaleString()} assets · {fmtKES(bookSum)} book value
+            </h2>
+            <p className="max-w-2xl text-sm text-white/80 leading-relaxed">
+              {activeCount} active · {fmtKES(totalValue)} original cost
+              {dueSoon.length > 0 && <> · <span className="font-semibold text-amber-200">{dueSoon.length} service due{ dueSoon.length !== 1 ? "s" : "" }</span></>}
+              {inMaint > 0 && <> · {inMaint} in maintenance</>}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1 md:pt-0">
+            <Button
+              onClick={() => { setEditing(null); setShowForm(true); }}
+              size="sm"
+              className="bg-white text-[#003399] font-semibold shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_4px_16px_-2px_rgba(0,0,0,0.25)] hover:bg-white/95 active:scale-[0.98] transition-all"
+            >
+              <Plus className="mr-1.5 h-4 w-4 text-[#003399]" /> New asset
+            </Button>
+          </div>
+        </div>
+      </motion.section>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -163,7 +201,7 @@ function AssetsPage() {
           <TableHeader>
             <TableRow className="bg-white">
               <TableHead>Asset</TableHead>
-              <TableHead>Location · Owner</TableHead>
+              <TableHead>Staff</TableHead>
               <TableHead className="text-right">Meter</TableHead>
               <TableHead className="text-right">Book value</TableHead>
               <TableHead>Service</TableHead>
@@ -187,7 +225,7 @@ function AssetsPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm"><div>{a.location}</div><div className="text-[11px] text-muted-foreground">{a.assignedTo}</div></TableCell>
+                  <TableCell className="text-sm"><div>{a.staff || a.assignedTo || "Unassigned"}</div></TableCell>
                   <TableCell className="text-right font-mono text-sm">{currentMeter(a).toLocaleString()} <span className="text-[10px] text-muted-foreground">{a.meterUnit}</span></TableCell>
                   <TableCell className="text-right font-mono text-sm">{fmtKES(bookValue(a))}</TableCell>
                   <TableCell>

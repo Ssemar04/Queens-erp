@@ -69,8 +69,8 @@ function Body({ asset, onAddReading, onAddService, onAddIncome, onRemoveIncome }
         </SheetTitle>
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           <Badge variant="outline">{asset.category}</Badge>
-          <Badge variant="outline">{asset.location}</Badge>
-          <Badge variant="outline">Assigned · {asset.assignedTo}</Badge>
+          {asset.location && <Badge variant="outline">{asset.location}</Badge>}
+          <Badge variant="outline">Staff · {asset.staff || asset.assignedTo || "Unassigned"}</Badge>
           <StatusChip status={asset.status} />
         </div>
       </SheetHeader>
@@ -362,7 +362,7 @@ const PRESETS: { key: RangePreset; label: string }[] = [
 ];
 
 function FinancePanel({ asset, onAddIncome, onRemoveIncome }: { asset: Asset; onAddIncome: Props["onAddIncome"]; onRemoveIncome: Props["onRemoveIncome"] }) {
-  const annual = (asset.purchaseCost - asset.salvageValue) / Math.max(1, asset.usefulLifeYears);
+  const annual = (asset.purchaseCost - (asset.salvageValue ?? 0)) / Math.max(1, asset.usefulLifeYears);
   const bv = bookValue(asset);
   const accumDep = asset.purchaseCost - bv;
   const totalService = asset.services.reduce((s, x) => s + x.cost, 0);

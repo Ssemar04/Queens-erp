@@ -54,6 +54,7 @@ export interface BankTxn {
   mobileProvider?: MobileProvider;
   reconciled: boolean;
   attachment?: ReceiptAttachment | null;
+  performedBy?: string;
   createdAt: string;
 }
 

@@ -1092,6 +1092,7 @@ def init_branch_db_tables(db):
         )
     ensure_performance_indexes(db)
     add_missing_columns(db, "sales_orders", [("decline_reason", "TEXT"), ("complaints", "TEXT")])
+    add_missing_columns(db, "bank_transactions", [("performed_by", "TEXT NOT NULL DEFAULT ''")])
     db.commit()
 
 

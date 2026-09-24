@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Search, Users, UserCheck, UserMinus, MapPin, LayoutGrid, List as ListIcon, Mail, Phone, Trash2, Building2, ShieldCheck } from "lucide-react";
+import { Plus, Search, Users, UserCheck, UserMinus, MapPin, LayoutGrid, List as ListIcon, Mail, Phone, Trash2, Building2, ShieldCheck, Sparkles, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 import { useRole } from "@/hooks/useRole";
 import {
   useEmployees,
@@ -137,23 +138,65 @@ function EmployeesPage() {
     toast.success(`${emp.name} deleted`);
   }
 
+  const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
+
   return (
-    <div className="space-y-4">
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Employees</h1>
-          <p className="text-sm text-muted-foreground">Personnel directory grouped by branch locations</p>
+    <div className="space-y-6">
+      <motion.section
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.02 * sectionIndex("hero"), duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+        className="relative overflow-hidden rounded-2xl border border-[#003399]/15 bg-gradient-to-br from-[#003399] via-[#003399] to-[#004CCC] text-white p-6 shadow-[0_10px_40px_-18px_rgba(0,51,153,0.45)]"
+      >
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+        <div className="absolute -left-24 -bottom-28 h-72 w-72 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+        <div className="absolute right-6 top-1/2 hidden md:block -translate-y-1/2 pointer-events-none">
+          <div className="relative">
+            <div className="h-20 w-20 rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.06)] -rotate-3">
+              <Users className="h-10 w-10 text-white" />
+            </div>
+            <div className="absolute -bottom-2 -right-3 h-8 w-8 rounded-xl bg-violet-400/90 text-[#111] flex items-center justify-center shadow-lg">
+              <Briefcase className="h-4 w-4" />
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <Button variant="outline" onClick={() => setDeptModalOpen(true)}>
-              <Building2 className="h-4 w-4 mr-1.5" />
-              Manage departments
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium ring-1 ring-white/15 backdrop-blur">
+              <Sparkles className="h-3.5 w-3.5" />
+              People hub
+            </div>
+            <h2 className="text-2xl font-bold leading-tight md:text-[28px]">
+              {kpis.total.toLocaleString()} employees · UGX {(kpis.payroll / 1_000_000).toFixed(2)}M payroll
+            </h2>
+            <p className="max-w-2xl text-sm text-white/80 leading-relaxed">
+              {kpis.active} active · {kpis.onLeave} on leave · {kpis.branchCount} branch{ kpis.branchCount !== 1 ? "es" : "" }
+              {filtered.length !== employees.length && <> · showing {filtered.length} filtered</>}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1 md:pt-0">
+            {isAdmin && (
+              <Button
+                variant="outline"
+                onClick={() => setDeptModalOpen(true)}
+                size="sm"
+                className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white ring-1 ring-white/15"
+              >
+                <Building2 className="h-4 w-4 mr-1.5" />
+                Manage departments
+              </Button>
+            )}
+            <Button
+              onClick={() => { setEditing(null); setFormOpen(true); }}
+              size="sm"
+              className="bg-white text-[#003399] font-semibold shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_4px_16px_-2px_rgba(0,0,0,0.25)] hover:bg-white/95 active:scale-[0.98] transition-all"
+            >
+              <Plus className="h-4 w-4 mr-1.5 text-[#003399]" />
+              Add employee
             </Button>
-          )}
-          <Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4 mr-1.5" />Add employee</Button>
+          </div>
         </div>
-      </header>
+      </motion.section>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi icon={<Users className="h-4 w-4" />} label="Headcount" value={kpis.total} tint="from-emerald-500/15 to-teal-500/5" />

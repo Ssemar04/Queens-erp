@@ -55,16 +55,17 @@ export interface Asset {
   name: string;
   category: string;
   serialNumber: string;
-  manufacturer: string;
+  manufacturer?: string;
   model: string;
-  location: string;
-  assignedTo: string;
+  location?: string;
+  assignedTo?: string;
+  staff?: string;
   purchaseDate: string;
   purchaseCost: number;
-  salvageValue: number;
+  salvageValue?: number;
   usefulLifeYears: number;
   status: AssetStatus;
-  condition: AssetCondition;
+  condition?: AssetCondition;
   meterUnit: MeterUnit;
   serviceIntervalMeter: number;
   serviceIntervalDays: number;
@@ -248,10 +249,11 @@ export function ageYears(a: Asset): number {
 }
 
 export function bookValue(a: Asset): number {
+  const salvage = a.salvageValue ?? 0;
   const annual =
-    (a.purchaseCost - a.salvageValue) / Math.max(1, a.usefulLifeYears);
+    (a.purchaseCost - salvage) / Math.max(1, a.usefulLifeYears);
   const v = a.purchaseCost - annual * ageYears(a);
-  return Math.max(a.salvageValue, v);
+  return Math.max(salvage, v);
 }
 
 export function nextServiceDueDate(a: Asset): string | null {
