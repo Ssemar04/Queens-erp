@@ -132,12 +132,6 @@ export function ItemDetailSheet({
     initialData: [],
   });
 
-  if (!item) return null;
-
-  const category = categories.find((c) => c.id === item.categoryId);
-  const supplier = suppliers.find((s) => s.id === item.supplierId);
-  const status = stockStatus(item);
-
   // Filter sales orders that include this item
   const itemSales = useMemo(() => {
     if (!item) return [];
@@ -151,7 +145,7 @@ export function ItemDetailSheet({
     for (const order of allOrders) {
       if (!order.items || order.items.length === 0) continue;
       for (const lineItem of order.items) {
-        const matchesId = lineItem.id === item.id || lineItem.name?.toLowerCase() === item.name.toLowerCase();
+        const matchesId = lineItem.id === item.id || (item.name && lineItem.name?.toLowerCase() === item.name.toLowerCase());
         if (matchesId) {
           salesList.push({
             order,
@@ -167,6 +161,12 @@ export function ItemDetailSheet({
 
   const totalUnitsSold = useMemo(() => itemSales.reduce((acc, curr) => acc + curr.quantity, 0), [itemSales]);
   const totalSalesRevenue = useMemo(() => itemSales.reduce((acc, curr) => acc + curr.totalAmount, 0), [itemSales]);
+
+  if (!item) return null;
+
+  const category = categories.find((c) => c.id === item.categoryId);
+  const supplier = suppliers.find((s) => s.id === item.supplierId);
+  const status = stockStatus(item);
 
   function handleOpenUpdateDialog(mode: "receive" | "reorder" | "adjust" = "receive") {
     setUpdateMode(mode);
