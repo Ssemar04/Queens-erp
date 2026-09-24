@@ -148,27 +148,11 @@ def list_all_documents():
     return jsonify([sales_order_document_from_row(r) for r in rows])
 
 
-@orders_bp.route("/api/orders/<order_id>/documents")
-def list_order_documents(order_id):
-    _, auth_error = require_current_user()
-    if auth_error:
-        return auth_error
-
-    if not orders_service.get_order(order_id):
-        return jsonify({"success": False, "message": "Order not found"}), 404
-
-    rows = orders_service.list_documents(order_id=order_id)
-    return jsonify([sales_order_document_from_row(r) for r in rows])
-
-
-@orders_bp.route("/api/orders/<order_id>/documents", methods=["POST"])
-def upload_order_document(order_id):
+@orders_bp.route("/api/documents", methods=["POST"])
+def upload_global_document():
     user, auth_error = require_manager_user()
     if auth_error:
         return auth_error
-
-    if not orders_service.get_order(order_id):
-        return jsonify({"success": False, "message": "Order not found"}), 404
 
     data = request.get_json(silent=True) or {}
     required_fields = ["documentType", "fileName", "dataUrl"]
@@ -180,7 +164,48 @@ def upload_order_document(order_id):
         }), 400
 
     payload = dict(data)
-    payload["salesOrderId"] = order_id
+    if "salesOrderId" not in payload or not payload["salesOrderId"]:
+        payload["salesOrderId"] = "shared"
+    if "uploadedBy" not in payload or not payload["uploadedBy"]:
+        try:
+            payload["uploadedBy"] = user.get("name") or user.get("email") or ""
+        except Exception:
+            pass
+
+    row = orders_service.upload_document(payload)
+    if not row:
+        return jsonify({"success": False, "message": "Failed to upload document"}), 500
+
+    return jsonify(sales_order_document_from_row(row)), 201
+
+
+@orders_bp.route("/api/orders/<order_id>/documents", methods=["GET"])
+def list_order_documents(order_id):
+    _, auth_error = require_current_user()
+    if auth_error:
+        return auth_error
+
+    rows = orders_service.list_documents(order_id=order_id)
+    return jsonify([sales_order_document_from_row(r) for r in rows])
+
+
+@orders_bp.route("/api/orders/<order_id>/documents", methods=["POST"])
+def upload_order_document(order_id):
+    user, auth_error = require_manager_user()
+    if auth_error:
+        return auth_error
+
+    data = request.get_json(silent=True) or {}
+    required_fields = ["documentType", "fileName", "dataUrl"]
+    missing = [f for f in required_fields if not data.get(f)]
+    if missing:
+        return jsonify({
+            "success": False,
+            "message": f"Missing required field: {', '.join(missing)}"
+        }), 400
+
+    payload = dict(data)
+    payload["salesOrderId"] = order_id or "shared"
     if "uploadedBy" not in payload or not payload["uploadedBy"]:
         try:
             payload["uploadedBy"] = user.get("name") or user.get("email") or ""

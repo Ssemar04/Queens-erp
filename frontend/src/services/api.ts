@@ -427,8 +427,17 @@ export const uploadOrderDocument = async (
   orderId: string,
   payload: Omit<SalesOrderDocument, "id" | "salesOrderId" | "uploadedAt" | "updatedAt"> & { id?: string }
 ): Promise<SalesOrderDocument> => {
-  const response = await api.post(`/orders/${orderId}/documents`, payload);
-  return response.data;
+  try {
+    const targetId = orderId || "shared";
+    const response = await api.post(`/orders/${targetId}/documents`, payload);
+    return response.data;
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      const response = await api.post("/documents", { ...payload, salesOrderId: orderId || "shared" });
+      return response.data;
+    }
+    throw err;
+  }
 };
 
 export const getOrderDocument = async (docId: string): Promise<SalesOrderDocument> => {

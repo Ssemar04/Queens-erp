@@ -2544,11 +2544,7 @@ function DocumentsWorkspace({ orders, employees, canManageDocs, documents, onRef
   }
 
   async function handleUploadFile(spec: (typeof DOCUMENT_CATALOG)[number], file: File) {
-    const targetOrderId = selectedOrderId || orders[0]?.id;
-    if (!targetOrderId) {
-      toast.error("Please create at least one sales order or LPO account first.");
-      return;
-    }
+    const targetOrderId = selectedOrderId || orders[0]?.id || "shared";
     if (file.size > 10 * 1024 * 1024) {
       toast.error("File too large (max 10 MB)");
       return;
