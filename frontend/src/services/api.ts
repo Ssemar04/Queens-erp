@@ -429,7 +429,7 @@ export const uploadOrderDocument = async (
 ): Promise<SalesOrderDocument> => {
   try {
     const targetId = orderId || "shared";
-    const response = await api.post(`/orders/${targetId}/documents`, payload);
+    const response = await api.post("/documents", { ...payload, salesOrderId: targetId });
     return response.data;
   } catch (err: any) {
     if (err?.response?.status === 404) {
@@ -805,7 +805,7 @@ export const updateEmployeeAccount = async (
 ): Promise<EmployeeAccountUpdateResponse> => {
   const response = await api.patch(`/employees/${empId}/account`, updates);
   return response.data;
-};
+    const response = await api.post("/documents", { ...payload, salesOrderId: targetId });
 
 export const createEmployee = async (emp: EmployeeDraft): Promise<CreatedEmployeeResponse> => {
   const response = await api.post("/employees", emp);
