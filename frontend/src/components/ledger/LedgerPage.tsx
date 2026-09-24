@@ -490,7 +490,7 @@ function EntryPreviewDialog({
     "aging",
     "meta",
     "financials",
-    entry.payments.length > 0 || true ? "payments" : null,
+    entry.payments.length > 0 ? "payments" : null,
     entry.promiseToPay ? "promise" : null,
     entry.tags.length > 0 ? "tags" : null,
     entry.notes ? "notes" : null,

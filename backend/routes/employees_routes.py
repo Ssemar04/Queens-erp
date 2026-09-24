@@ -27,6 +27,14 @@ def list_employees():
     return jsonify([employee_from_row(emp) for emp in employees])
 
 
+@employees_bp.route("/next-code", methods=["GET"])
+def get_next_code():
+    _, error = require_admin_user()
+    if error:
+        return error
+    return jsonify({"code": next_employee_code()})
+
+
 @employees_bp.route("/<emp_id>", methods=["GET"])
 def get_single_employee(emp_id):
     _, error = require_current_user()
@@ -58,14 +66,6 @@ def reset_credentials_route(emp_id):
     if cred is None:
         return jsonify({"error": "Employee not found"}), 404
     return jsonify(cred)
-
-
-@employees_bp.route("/next-code", methods=["GET"])
-def get_next_code():
-    _, error = require_admin_user()
-    if error:
-        return error
-    return jsonify({"code": next_employee_code()})
 
 
 @employees_bp.route("", methods=["POST"])

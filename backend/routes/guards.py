@@ -36,6 +36,19 @@ def require_admin_user():
     return user, None
 
 
+def require_manager_user():
+    user, error = require_current_user()
+    if error:
+        return None, error
+    role = (user.get("role") or "").lower()
+    if role not in {"admin", "manager"}:
+        return None, (jsonify({
+            "success": False,
+            "message": "Manager or Administrator access required"
+        }), 403)
+    return user, None
+
+
 def require_employee_user():
     user, error = require_current_user()
     if error:

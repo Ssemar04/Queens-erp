@@ -3,7 +3,7 @@ import sqlite3
 
 from flask import Blueprint, request, jsonify
 
-from models.serializers import asset_from_record
+from models.serializers import asset_from_record, asset_income_from_row
 from services.assets_service import (
     get_assets,
     get_asset,
@@ -19,8 +19,6 @@ from services.assets_service import (
     delete_asset_income,
 )
 
-from models.serializers import asset_from_record, asset_income_from_row
-
 assets_bp = Blueprint("assets", __name__, url_prefix="/api/assets")
 
 
@@ -28,6 +26,11 @@ assets_bp = Blueprint("assets", __name__, url_prefix="/api/assets")
 def list_assets():
     assets = get_assets()
     return jsonify([asset_from_record(asset) for asset in assets])
+
+
+@assets_bp.route("/next-tag", methods=["GET"])
+def next_tag_route():
+    return jsonify({"tag": next_tag()})
 
 
 @assets_bp.route("/<asset_id>", methods=["GET"])
@@ -103,10 +106,6 @@ def add_service_record_route(asset_id):
         return jsonify({"error": "Asset not found"}), 404
     return jsonify(asset_from_record(asset))
 
-
-@assets_bp.route("/next-tag", methods=["GET"])
-def next_tag_route():
-    return jsonify({"tag": next_tag()})
 
 
 @assets_bp.route("/<asset_id>/income", methods=["GET"])

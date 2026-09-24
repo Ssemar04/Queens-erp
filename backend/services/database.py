@@ -108,10 +108,8 @@ def get_branch_db(branch_id=None):
                 from services.postgres_adapter import schema_name_for_branch
 
                 conn = get_postgres_schema_connection(schema_name_for_branch(clean_id))
-                is_new = not table_exists(conn, "items")
             else:
                 db_path = get_branch_db_path(clean_id)
-                is_new = not db_path.exists()
                 conn = sqlite3.connect(db_path, timeout=30)
                 conn.row_factory = sqlite3.Row
                 conn.execute("PRAGMA busy_timeout = 30000")
@@ -120,8 +118,7 @@ def get_branch_db(branch_id=None):
                 conn.execute("PRAGMA synchronous = NORMAL")
                 conn.execute("PRAGMA temp_store = MEMORY")
             g.branch_dbs[clean_id] = conn
-            if is_new:
-                init_branch_db_tables(conn)
+            init_branch_db_tables(conn)
         return g.branch_dbs[clean_id]
     except RuntimeError:
         # Outside Flask app context
@@ -129,10 +126,8 @@ def get_branch_db(branch_id=None):
             from services.postgres_adapter import schema_name_for_branch
 
             conn = get_postgres_schema_connection(schema_name_for_branch(clean_id))
-            is_new = not table_exists(conn, "items")
         else:
             db_path = get_branch_db_path(clean_id)
-            is_new = not db_path.exists()
             conn = sqlite3.connect(db_path, timeout=30)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA busy_timeout = 30000")
@@ -140,8 +135,7 @@ def get_branch_db(branch_id=None):
             conn.execute("PRAGMA journal_mode = WAL")
             conn.execute("PRAGMA synchronous = NORMAL")
             conn.execute("PRAGMA temp_store = MEMORY")
-        if is_new:
-            init_branch_db_tables(conn)
+        init_branch_db_tables(conn)
         return conn
 
 
@@ -729,13 +723,64 @@ def init_branch_db_tables(db):
             date_to_be_delivered TEXT NOT NULL,
             handled_by TEXT NOT NULL,
             employee_id TEXT,
-            status TEXT NOT NULL DEFAULT 'confirmed',
+            status TEXT NOT NULL DEFAULT 'submitted',
+            decline_reason TEXT,
+            complaints TEXT NOT NULL DEFAULT '[]',
             amount REAL NOT NULL DEFAULT 0,
             notes TEXT,
+            required_document_types TEXT,
+            account_details TEXT,
+            is_lpo_account INTEGER DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE SET NULL
         );
+
+        for col_def in [
+            ("required_document_types", "TEXT"),
+            ("account_details", "TEXT"),
+            ("is_lpo_account", "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                db.execute(f"ALTER TABLE sales_orders ADD COLUMN {col_def[0]} {col_def[1]}")
+            except Exception:
+                pass
+
+        CREATE TABLE IF NOT EXISTS sales_order_items (
+            id TEXT PRIMARY KEY,
+            sales_order_id TEXT NOT NULL,
+            item_id TEXT,
+            name TEXT NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            unit_price REAL NOT NULL DEFAULT 0,
+            total REAL NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sales_order_id) REFERENCES sales_orders (id) ON DELETE CASCADE,
+            FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE SET NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_sales_order_items_order_id
+            ON sales_order_items (sales_order_id, sort_order);
+
+        CREATE TABLE IF NOT EXISTS sales_order_documents (
+            id TEXT PRIMARY KEY,
+            sales_order_id TEXT NOT NULL,
+            document_type TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            file_name TEXT NOT NULL,
+            file_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+            file_size INTEGER NOT NULL DEFAULT 0,
+            data_url TEXT NOT NULL,
+            uploaded_by TEXT NOT NULL DEFAULT '',
+            uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sales_order_id) REFERENCES sales_orders (id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_sales_order_docs_order_type
+            ON sales_order_documents (sales_order_id, document_type);
 
         CREATE TABLE IF NOT EXISTS loyalty_tiers (
             id TEXT PRIMARY KEY,
@@ -1046,6 +1091,7 @@ def init_branch_db_tables(db):
             (tier_id, name, min_p, max_p, color)
         )
     ensure_performance_indexes(db)
+    add_missing_columns(db, "sales_orders", [("decline_reason", "TEXT"), ("complaints", "TEXT")])
     db.commit()
 
 

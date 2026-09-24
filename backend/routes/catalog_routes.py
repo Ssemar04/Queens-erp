@@ -24,22 +24,6 @@ def list_items():
     return jsonify([item_from_row(row) for row in catalog_service.list_items(request.args)])
 
 
-@catalog_bp.route("/api/items/<item_id>")
-def get_item(item_id):
-    _, auth_error = require_current_user()
-    if auth_error:
-        return auth_error
-
-    row = catalog_service.get_item(item_id)
-    if not row:
-        return jsonify({
-            "success": False,
-            "message": "Item not found"
-        }), 404
-
-    return jsonify(item_from_row(row))
-
-
 @catalog_bp.route("/api/items/next-sku")
 def get_next_sku():
     _, auth_error = require_current_user()
@@ -56,6 +40,22 @@ def get_next_barcode():
         return auth_error
 
     return jsonify({"barcode": catalog_service.next_barcode()})
+
+
+@catalog_bp.route("/api/items/<item_id>")
+def get_item(item_id):
+    _, auth_error = require_current_user()
+    if auth_error:
+        return auth_error
+
+    row = catalog_service.get_item(item_id)
+    if not row:
+        return jsonify({
+            "success": False,
+            "message": "Item not found"
+        }), 404
+
+    return jsonify(item_from_row(row))
 
 
 @catalog_bp.route("/api/items", methods=["POST"])

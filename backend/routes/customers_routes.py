@@ -26,18 +26,6 @@ def list_customers():
     return jsonify([customer_from_record(customer) for customer in customers])
 
 
-@customers_bp.route("/<customer_id>", methods=["GET"])
-def get_single_customer(customer_id):
-    _, auth_error = require_current_user()
-    if auth_error:
-        return auth_error
-
-    customer = get_customer(customer_id)
-    if not customer:
-        return jsonify({"error": "Customer not found"}), 404
-    return jsonify(customer_from_record(customer))
-
-
 @customers_bp.route("", methods=["POST"])
 def create_customer_route():
     _, auth_error = require_current_user()
@@ -54,6 +42,29 @@ def create_customer_route():
         return jsonify({"error": "A customer with that reference already exists"}), 409
 
     return jsonify(customer_from_record(customer)), 201
+
+
+@customers_bp.route("/next-reference", methods=["GET"])
+def next_customer_reference_route():
+    _, auth_error = require_current_user()
+    if auth_error:
+        return auth_error
+
+    from services.customers_service import next_reference
+
+    return jsonify({"reference": next_reference()})
+
+
+@customers_bp.route("/<customer_id>", methods=["GET"])
+def get_single_customer(customer_id):
+    _, auth_error = require_current_user()
+    if auth_error:
+        return auth_error
+
+    customer = get_customer(customer_id)
+    if not customer:
+        return jsonify({"error": "Customer not found"}), 404
+    return jsonify(customer_from_record(customer))
 
 
 @customers_bp.route("/<customer_id>", methods=["PATCH"])
@@ -77,17 +88,6 @@ def update_customer_route(customer_id):
     if not customer:
         return jsonify({"error": "Customer not found"}), 404
     return jsonify(customer_from_record(customer))
-
-
-@customers_bp.route("/next-reference", methods=["GET"])
-def next_customer_reference_route():
-    _, auth_error = require_current_user()
-    if auth_error:
-        return auth_error
-
-    from services.customers_service import next_reference
-
-    return jsonify({"reference": next_reference()})
 
 
 @customers_bp.route("/<customer_id>", methods=["DELETE"])

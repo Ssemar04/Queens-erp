@@ -3,7 +3,7 @@ import type { BankAccount, BankTxn, StatementLine } from "@/components/bank/bank
 import type { AuditEntry, Expense } from "@/components/expenses/expenses-store";
 import type { LedgerEntry, LedgerKind, Payment } from "@/components/ledger/ledger-store";
 import type { Branch, Category, Item, Location, Notification, PurchaseOrder, StockMovement, Supplier } from "@/types/inventory";
-import type { SalesOrder } from "@/types/sales-order";
+import type { SalesOrder, SalesOrderDocument } from "@/types/sales-order";
 import type { ItemFilters } from "@/lib/demo-store";
 import type { Asset, AssetIncome, MeterReading, ServiceRecord } from "@/components/assets/assets-store";
 import type { Employee, EmployeeDraft } from "@/components/employees/employees-store";
@@ -411,6 +411,33 @@ export const updateOrder = async (id: string, updates: Partial<SalesOrder>): Pro
 
 export const deleteOrder = async (id: string): Promise<void> => {
   await api.delete(`/orders/${id}`);
+};
+
+export const getAllDocuments = async (): Promise<SalesOrderDocument[]> => {
+  const response = await api.get("/documents");
+  return response.data;
+};
+
+export const getOrderDocuments = async (orderId: string): Promise<SalesOrderDocument[]> => {
+  const response = await api.get(`/orders/${orderId}/documents`);
+  return response.data;
+};
+
+export const uploadOrderDocument = async (
+  orderId: string,
+  payload: Omit<SalesOrderDocument, "id" | "salesOrderId" | "uploadedAt" | "updatedAt"> & { id?: string }
+): Promise<SalesOrderDocument> => {
+  const response = await api.post(`/orders/${orderId}/documents`, payload);
+  return response.data;
+};
+
+export const getOrderDocument = async (docId: string): Promise<SalesOrderDocument> => {
+  const response = await api.get(`/documents/${docId}`);
+  return response.data;
+};
+
+export const deleteOrderDocument = async (docId: string): Promise<void> => {
+  await api.delete(`/documents/${docId}`);
 };
 
 export interface BankState {

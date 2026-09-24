@@ -263,7 +263,25 @@ def movement_from_row(row):
     }
 
 
-def sales_order_from_row(row):
+def sales_order_item_from_row(row):
+    def get(col, default=None):
+        try:
+            val = row[col]
+            return val if val is not None else default
+        except (KeyError, IndexError):
+            return default
+
+    return {
+        "id": row["id"],
+        "itemId": get("item_id"),
+        "name": get("name", ""),
+        "quantity": int(get("quantity", 1) or 1),
+        "unitPrice": float(get("unit_price", 0) or 0),
+        "total": float(get("total", 0) or 0),
+    }
+
+
+def sales_order_from_row(row, items=None):
     attachment = None
     if row["quotation_attachment"]:
         try:
@@ -278,6 +296,34 @@ def sales_order_from_row(row):
         except (KeyError, IndexError):
             return default
 
+    complaints = []
+    raw_complaints = get("complaints")
+    if raw_complaints:
+        try:
+            parsed = json.loads(raw_complaints)
+            if isinstance(parsed, list):
+                complaints = parsed
+        except (json.JSONDecodeError, TypeError):
+            complaints = []
+
+    req_docs = []
+    raw_req_docs = get("required_document_types")
+    if raw_req_docs:
+        try:
+            parsed = json.loads(raw_req_docs)
+            if isinstance(parsed, list):
+                req_docs = parsed
+        except (json.JSONDecodeError, TypeError):
+            req_docs = []
+
+    acc_details = None
+    raw_acc_details = get("account_details")
+    if raw_acc_details:
+        try:
+            acc_details = json.loads(raw_acc_details)
+        except (json.JSONDecodeError, TypeError):
+            acc_details = None
+
     return {
         "id": row["id"],
         "lpoNumber": get("lpo_number", ""),
@@ -289,10 +335,40 @@ def sales_order_from_row(row):
         "dateToBeDelivered": get("date_to_be_delivered", ""),
         "handledBy": get("handled_by", ""),
         "employeeId": get("employee_id"),
-        "status": get("status", "draft"),
+        "status": get("status", "submitted"),
+        "declineReason": get("decline_reason"),
+        "complaints": complaints,
         "amount": float(get("amount", 0) or 0),
         "notes": get("notes"),
+        "requiredDocumentTypes": req_docs,
+        "accountDetails": acc_details,
+        "isLpoAccount": bool(get("is_lpo_account", 0)),
+        "items": [sales_order_item_from_row(it) for it in (items or [])],
         "createdAt": get("created_at", ""),
+        "updatedAt": get("updated_at"),
+    }
+
+
+def sales_order_document_from_row(row):
+    def get(col, default=None):
+        try:
+            val = row[col]
+            return val if val is not None else default
+        except (KeyError, IndexError):
+            return default
+
+    return {
+        "id": row["id"],
+        "salesOrderId": get("sales_order_id", ""),
+        "documentType": get("document_type", ""),
+        "title": get("title", ""),
+        "description": get("description", ""),
+        "fileName": get("file_name", ""),
+        "fileType": get("file_type", "application/octet-stream"),
+        "fileSize": int(get("file_size", 0) or 0),
+        "dataUrl": get("data_url", ""),
+        "uploadedBy": get("uploaded_by", ""),
+        "uploadedAt": get("uploaded_at", ""),
         "updatedAt": get("updated_at"),
     }
 
