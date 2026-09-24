@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -18,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Check, Receipt, User, CreditCard, Package, Boxes, Search, Sparkles, X, Plus, Minus, Trash2, ShoppingCart } from "lucide-react";
+import { Check, Receipt, User, CreditCard, Package, Boxes, Search, Sparkles, X, Plus, Minus, Trash2, ShoppingCart, FileText } from "lucide-react";
 import { MovementType, type SaleItem } from "@/types/inventory";
 import type {
   Item,
@@ -94,6 +95,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
 
   const [itemId, setItemId] = useState("");
   const [itemSearch, setItemSearch] = useState("");
+  const [itemDescription, setItemDescription] = useState("");
   const [itemFocused, setItemFocused] = useState(false);
   const [assetId, setAssetId] = useState<string>("__none__");
   const [quantity, setQuantity] = useState("1");
@@ -144,6 +146,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
     if (open) {
       setItemId("");
       setItemSearch("");
+      setItemDescription("");
       setItemFocused(false);
       setAssetId("__none__");
       setQuantity("1");
@@ -166,7 +169,10 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
   }, [open, currentBranchId, authenticatedUserName]);
 
   useEffect(() => {
-    if (selected) setUnitPrice(String(selected.sellingPrice));
+    if (selected) {
+      setUnitPrice(String(selected.sellingPrice));
+      if (selected.description) setItemDescription(selected.description);
+    }
   }, [selected]);
 
   const matchingItems = useMemo(() => {
@@ -196,6 +202,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
   function selectCatalogItem(item: Item) {
     setItemId(item.id);
     setItemSearch(item.name);
+    setItemDescription(item.description || "");
     setUnitPrice(String(item.sellingPrice));
     setItemFocused(false);
   }
@@ -337,6 +344,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       tempId: crypto.randomUUID(),
       itemId: itemId || null,
       itemName: saleItemName,
+      description: itemDescription.trim() || null,
       unitPrice: price,
       quantity: qty,
       discount: disc,
@@ -352,6 +360,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
     // Reset item inputs
     setItemId("");
     setItemSearch("");
+    setItemDescription("");
     setQuantity("1");
     setUnitPrice("0");
     setDiscount("0");
@@ -423,6 +432,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       finalLineItems = [{
         itemId: itemId || null,
         itemName: selected?.name ?? itemSearch.trim(),
+        description: itemDescription.trim() || null,
         unitPrice: price,
         quantity: qty,
         discount: disc,
@@ -439,6 +449,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
     const commonSale = {
       receiptNumber,
       itemName: firstLine.itemName,
+      description: firstLine.description || null,
       unitPrice: firstLine.unitPrice,
       totalAmount,
       discount: finalLineItems.reduce((s, li) => s + li.discount, 0),
@@ -470,12 +481,13 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       fromLocationId: null,
       toLocationId: null,
       reference: receiptNumber,
-      notes: idx === 0 ? `Sale to ${customerName}` : "",
+      notes: li.description || (idx === 0 ? `Sale to ${customerName}` : ""),
       performedBy: staff,
       createdAt,
       sale: {
         ...commonSale,
         itemName: li.itemName,
+        description: li.description || null,
         unitPrice: li.unitPrice,
         discount: li.discount,
         vat: li.vat,
@@ -563,6 +575,20 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
               {errors.itemId && <p className="mt-1 text-xs text-destructive">{errors.itemId}</p>}
             </div>
 
+            {/* Description field just below item field */}
+            <div>
+              <Label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <FileText className="h-3.5 w-3.5 text-primary" /> Description
+              </Label>
+              <Textarea
+                value={itemDescription}
+                onChange={(e) => setItemDescription(e.target.value)}
+                placeholder="Enter item description, specifications, or custom notes..."
+                rows={2}
+                className="resize-none text-sm focus-visible:ring-primary"
+              />
+            </div>
+
             <div>
               <Label className="mb-1.5 flex items-center gap-1.5 text-sm">
                 <Boxes className="h-3.5 w-3.5 text-muted-foreground" /> Asset (optional)
@@ -626,6 +652,9 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                   <div key={li.tempId} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-foreground">{li.itemName}</p>
+                      {li.description && (
+                        <p className="truncate text-xs text-muted-foreground italic">{li.description}</p>
+                      )}
                       <p className="text-xs text-muted-foreground font-mono">
                         {fmt(li.unitPrice)} × {li.quantity} · {fmt(li.lineTotal)}
                       </p>

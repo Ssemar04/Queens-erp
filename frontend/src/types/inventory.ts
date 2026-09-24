@@ -139,6 +139,7 @@ export type TransactionStatus = "paid" | "partial" | "pending" | "void";
 export interface SaleItem {
   itemId: string | null;
   itemName: string;
+  description?: string | null;
   unitPrice: number;
   quantity: number;
   discount: number;
@@ -152,6 +153,7 @@ export interface SaleItem {
 export interface SaleDetails {
   receiptNumber: string;
   itemName?: string | null;
+  description?: string | null;
   unitPrice: number;
   totalAmount: number;
   discount: number;
