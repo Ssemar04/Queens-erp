@@ -74,6 +74,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Procurement",
     items: [
+      { label: "Purchases", href: "/app/purchases", icon: ShoppingBag },
       { label: "Suppliers", href: "/app/suppliers", icon: Truck },
     ],
   },

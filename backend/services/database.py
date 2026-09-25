@@ -631,6 +631,31 @@ def init_branch_db_tables(db):
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS purchases (
+            id TEXT PRIMARY KEY,
+            purchase_number TEXT NOT NULL UNIQUE,
+            supplier_name TEXT NOT NULL,
+            supplier_id TEXT,
+            purchase_date TEXT NOT NULL,
+            expected_delivery_date TEXT,
+            category TEXT NOT NULL DEFAULT 'Inventory',
+            items_summary TEXT NOT NULL DEFAULT '',
+            subtotal REAL NOT NULL DEFAULT 0,
+            tax_amount REAL NOT NULL DEFAULT 0,
+            discount_amount REAL NOT NULL DEFAULT 0,
+            total_amount REAL NOT NULL DEFAULT 0,
+            paid_amount REAL NOT NULL DEFAULT 0,
+            payment_status TEXT NOT NULL DEFAULT 'unpaid',
+            order_status TEXT NOT NULL DEFAULT 'received',
+            payment_method TEXT NOT NULL DEFAULT 'bank_transfer',
+            purchased_by TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            attachment TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (supplier_id) REFERENCES suppliers (id) ON DELETE SET NULL
+        );
+
         CREATE TABLE IF NOT EXISTS items (
             id TEXT PRIMARY KEY,
             sku TEXT NOT NULL UNIQUE,
@@ -968,6 +993,7 @@ def init_branch_db_tables(db):
             model TEXT NOT NULL DEFAULT '',
             location TEXT NOT NULL DEFAULT '',
             assigned_to TEXT NOT NULL DEFAULT '',
+            staff TEXT NOT NULL DEFAULT '',
             purchase_date TEXT NOT NULL,
             purchase_cost REAL NOT NULL DEFAULT 0,
             salvage_value REAL NOT NULL DEFAULT 0,
@@ -984,6 +1010,30 @@ def init_branch_db_tables(db):
             notes TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS asset_consumables (
+            id TEXT PRIMARY KEY,
+            asset_id TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            unit TEXT NOT NULL DEFAULT '',
+            date_replaced TEXT NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            replaced_by TEXT NOT NULL DEFAULT '',
+            reason TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS asset_monthly_targets (
+            id TEXT PRIMARY KEY,
+            asset_id TEXT NOT NULL,
+            period TEXT NOT NULL,
+            income_target REAL NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE,
+            UNIQUE (asset_id, period)
         );
 
         CREATE TABLE IF NOT EXISTS asset_meter_readings (
@@ -1093,6 +1143,7 @@ def init_branch_db_tables(db):
     ensure_performance_indexes(db)
     add_missing_columns(db, "sales_orders", [("decline_reason", "TEXT"), ("complaints", "TEXT")])
     add_missing_columns(db, "bank_transactions", [("performed_by", "TEXT NOT NULL DEFAULT ''")])
+    add_missing_columns(db, "assets", [("staff", "TEXT NOT NULL DEFAULT ''")])
     db.commit()
 
 
@@ -1120,7 +1171,10 @@ def migrate_db():
 
     branches = central_db.execute("SELECT id FROM branches WHERE is_active = 1").fetchall()
     for branch in branches:
-        init_branch_db_tables(get_branch_db(branch["id"]))
+        branch_db = get_branch_db(branch["id"])
+        init_branch_db_tables(branch_db)
+        seed_expenses(branch_db)
+        seed_purchases(branch_db)
 
     from services.chat_service import ensure_chat_users_for_accounts, ensure_default_chat_channels, ensure_all_users_in_general_channel
     ensure_default_chat_channels(central_db)
@@ -1279,6 +1333,33 @@ def seed_expenses(db):
         VALUES (?, ?, ?, ?, ?, ?)
         """,
         audit,
+    )
+
+
+def seed_purchases(db):
+    if db.execute("SELECT COUNT(*) AS count FROM purchases").fetchone()["count"] > 0:
+        return
+
+    today = datetime.now(timezone.utc)
+
+    def iso_date(offset):
+        return (today + timedelta(days=offset)).date().isoformat()
+
+    purchases = [
+        ("pur_1", "PO-1001", "Kampala Tech Suppliers", "sup_1", iso_date(-5), iso_date(-2), "IT", "10x Wireless Keyboards & Mice", 1200000, 216000, 0, 1416000, 1416000, "paid", "received", "bank_transfer", "Wamala Leo", "Office peripherals update", None, iso_date(-5), iso_date(-5)),
+        ("pur_2", "PO-1002", "Crown Logistics & Spares", "sup_2", iso_date(-2), iso_date(3), "Machinery", "2x Heavy Duty Motor Assemblies", 4500000, 810000, 100000, 5210000, 2000000, "partially_paid", "ordered", "bank_transfer", "Nabwire Joan", "Spare parts for generator", None, iso_date(-2), iso_date(-2)),
+        ("pur_3", "PO-1003", "Stationery Hub Uganda", "sup_3", iso_date(-1), iso_date(1), "Office Supplies", "Printing Paper, Toner & Folders", 650000, 117000, 0, 767000, 0, "unpaid", "received", "cash", "Opio Daniel", "Quarterly stationery restocking", None, iso_date(-1), iso_date(-1)),
+    ]
+    db.executemany(
+        """
+        INSERT OR IGNORE INTO purchases (
+            id, purchase_number, supplier_name, supplier_id, purchase_date,
+            expected_delivery_date, category, items_summary, subtotal, tax_amount,
+            discount_amount, total_amount, paid_amount, payment_status, order_status,
+            payment_method, purchased_by, notes, attachment, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        purchases,
     )
 
 
@@ -1536,6 +1617,7 @@ def seed_assets(db):
             "model": "Hilux 2.4 D-4D",
             "location": "qt upper",
             "assigned_to": "Najib Ndawula",
+            "staff": "Najib Ndawula",
             "purchase_date": iso_date(-720),
             "purchase_cost": 3850000,
             "salvage_value": 600000,
@@ -1563,6 +1645,7 @@ def seed_assets(db):
             "model": "C60D5",
             "location": "Industrial Area",
             "assigned_to": "Facilities",
+            "staff": "Sam Kiberu",
             "purchase_date": iso_date(-1100),
             "purchase_cost": 1420000,
             "salvage_value": 200000,
@@ -1590,6 +1673,7 @@ def seed_assets(db):
             "model": "Printmaster PM52",
             "location": "Printworks Floor",
             "assigned_to": "Production",
+            "staff": "Faith Nakato",
             "purchase_date": iso_date(-1600),
             "purchase_cost": 6200000,
             "salvage_value": 800000,
@@ -1617,6 +1701,7 @@ def seed_assets(db):
             "model": "MBP16 M3 Pro",
             "location": "Design Studio",
             "assigned_to": "Shafi G.",
+            "staff": "Shafi G.",
             "purchase_date": iso_date(-220),
             "purchase_cost": 380000,
             "salvage_value": 60000,
@@ -1644,6 +1729,7 @@ def seed_assets(db):
             "model": "H30D",
             "location": "qt lower",
             "assigned_to": "Logistics",
+            "staff": "Kevin Kansiime",
             "purchase_date": iso_date(-900),
             "purchase_cost": 2100000,
             "salvage_value": 350000,
@@ -1668,20 +1754,20 @@ def seed_assets(db):
             """
             INSERT OR IGNORE INTO assets (
                 id, tag, name, category, serial_number, manufacturer, model, location,
-                assigned_to, purchase_date, purchase_cost, salvage_value, useful_life_years,
+                assigned_to, staff, purchase_date, purchase_cost, salvage_value, useful_life_years,
                 status, condition, meter_unit, service_interval_meter, service_interval_days,
                 last_service_date, last_service_meter, warranty_expiry, insurance_expiry,
                 notes, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 asset["id"], asset["tag"], asset["name"], asset["category"], asset["serial_number"],
                 asset["manufacturer"], asset["model"], asset["location"], asset["assigned_to"],
-                asset["purchase_date"], asset["purchase_cost"], asset["salvage_value"], asset["useful_life_years"],
-                asset["status"], asset["condition"], asset["meter_unit"], asset["service_interval_meter"],
-                asset["service_interval_days"], asset["last_service_date"], asset["last_service_meter"],
-                asset["warranty_expiry"], asset["insurance_expiry"], asset["notes"], asset["created_at"],
-                asset["updated_at"],
+                asset["staff"], asset["purchase_date"], asset["purchase_cost"], asset["salvage_value"],
+                asset["useful_life_years"], asset["status"], asset["condition"], asset["meter_unit"],
+                asset["service_interval_meter"], asset["service_interval_days"], asset["last_service_date"],
+                asset["last_service_meter"], asset["warranty_expiry"], asset["insurance_expiry"],
+                asset["notes"], asset["created_at"], asset["updated_at"],
             ),
         )
 
@@ -1974,6 +2060,157 @@ def seed_assets(db):
                 for i in income_records
             ],
         )
+
+    def iso_month(offset_months):
+        ref = today.replace(day=1) + timedelta(days=offset_months * 30)
+        return ref.date().isoformat()[:7]
+
+    consumables = [
+        {
+            "id": "con-demo-0001",
+            "asset_id": "ast-demo-0001",
+            "name": "Engine Oil 15W-40",
+            "unit": "L",
+            "date_replaced": iso_date(-90),
+            "quantity": 8,
+            "replaced_by": "Najib N.",
+            "reason": "5,000 km scheduled service",
+        },
+        {
+            "id": "con-demo-0002",
+            "asset_id": "ast-demo-0001",
+            "name": "Oil Filter",
+            "unit": "pc",
+            "date_replaced": iso_date(-90),
+            "quantity": 1,
+            "replaced_by": "Najib N.",
+            "reason": "5,000 km scheduled service",
+        },
+        {
+            "id": "con-demo-0003",
+            "asset_id": "ast-demo-0001",
+            "name": "Air Filter",
+            "unit": "pc",
+            "date_replaced": iso_date(-30),
+            "quantity": 1,
+            "replaced_by": "Najib N.",
+            "reason": "Dusty road conditions — premature replacement",
+        },
+        {
+            "id": "con-demo-0004",
+            "asset_id": "ast-demo-0002",
+            "name": "Diesel Fuel Filter",
+            "unit": "pc",
+            "date_replaced": iso_date(-110),
+            "quantity": 1,
+            "replaced_by": "Sam K.",
+            "reason": "250 hour scheduled service",
+        },
+        {
+            "id": "con-demo-0005",
+            "asset_id": "ast-demo-0002",
+            "name": "15W-40 Generator Oil",
+            "unit": "L",
+            "date_replaced": iso_date(-110),
+            "quantity": 24,
+            "replaced_by": "Sam K.",
+            "reason": "250 hour scheduled service",
+        },
+        {
+            "id": "con-demo-0006",
+            "asset_id": "ast-demo-0003",
+            "name": "Process Cyan Ink",
+            "unit": "kg",
+            "date_replaced": iso_date(-20),
+            "quantity": 2,
+            "replaced_by": "Faith N.",
+            "reason": "Annual report print run consumed stock",
+        },
+        {
+            "id": "con-demo-0007",
+            "asset_id": "ast-demo-0003",
+            "name": "Dampening Rollers",
+            "unit": "set",
+            "date_replaced": iso_date(-140),
+            "quantity": 1,
+            "replaced_by": "Faith N.",
+            "reason": "Uneven ink transfer on long runs",
+        },
+        {
+            "id": "con-demo-0008",
+            "asset_id": "ast-demo-0003",
+            "name": "Offset Blankets",
+            "unit": "pc",
+            "date_replaced": iso_date(-60),
+            "quantity": 2,
+            "replaced_by": "Faith N.",
+            "reason": "Torn edge on packaging job",
+        },
+        {
+            "id": "con-demo-0009",
+            "asset_id": "ast-demo-0004",
+            "name": "Thermal Paste (Arctic MX-4)",
+            "unit": "g",
+            "date_replaced": iso_date(-30),
+            "quantity": 4,
+            "replaced_by": "Shafi G.",
+            "reason": "CPU temps climbing during design sprints",
+        },
+        {
+            "id": "con-demo-0010",
+            "asset_id": "ast-demo-0005",
+            "name": "Forklift Hydraulic Oil",
+            "unit": "L",
+            "date_replaced": iso_date(-130),
+            "quantity": 30,
+            "replaced_by": "Kevin K.",
+            "reason": "500 hour major service",
+        },
+    ]
+    db.executemany(
+        """
+        INSERT OR IGNORE INTO asset_consumables (
+            id, asset_id, name, unit, date_replaced, quantity, replaced_by, reason
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (c["id"], c["asset_id"], c["name"], c["unit"], c["date_replaced"],
+             c["quantity"], c["replaced_by"], c["reason"])
+            for c in consumables
+        ],
+    )
+
+    monthly_targets = [
+        {"id": "tgt-demo-0001", "asset_id": "ast-demo-0001", "period": iso_month(-3), "income_target": 350000},
+        {"id": "tgt-demo-0002", "asset_id": "ast-demo-0001", "period": iso_month(-2), "income_target": 380000},
+        {"id": "tgt-demo-0003", "asset_id": "ast-demo-0001", "period": iso_month(-1), "income_target": 400000},
+        {"id": "tgt-demo-0004", "asset_id": "ast-demo-0001", "period": iso_month(0), "income_target": 450000},
+        {"id": "tgt-demo-0005", "asset_id": "ast-demo-0002", "period": iso_month(-3), "income_target": 180000},
+        {"id": "tgt-demo-0006", "asset_id": "ast-demo-0002", "period": iso_month(-2), "income_target": 200000},
+        {"id": "tgt-demo-0007", "asset_id": "ast-demo-0002", "period": iso_month(-1), "income_target": 220000},
+        {"id": "tgt-demo-0008", "asset_id": "ast-demo-0002", "period": iso_month(0), "income_target": 250000},
+        {"id": "tgt-demo-0009", "asset_id": "ast-demo-0003", "period": iso_month(-3), "income_target": 1000000},
+        {"id": "tgt-demo-0010", "asset_id": "ast-demo-0003", "period": iso_month(-2), "income_target": 1200000},
+        {"id": "tgt-demo-0011", "asset_id": "ast-demo-0003", "period": iso_month(-1), "income_target": 1500000},
+        {"id": "tgt-demo-0012", "asset_id": "ast-demo-0003", "period": iso_month(0), "income_target": 1800000},
+        {"id": "tgt-demo-0013", "asset_id": "ast-demo-0004", "period": iso_month(-2), "income_target": 250000},
+        {"id": "tgt-demo-0014", "asset_id": "ast-demo-0004", "period": iso_month(-1), "income_target": 300000},
+        {"id": "tgt-demo-0015", "asset_id": "ast-demo-0004", "period": iso_month(0), "income_target": 350000},
+        {"id": "tgt-demo-0016", "asset_id": "ast-demo-0005", "period": iso_month(-2), "income_target": 500000},
+        {"id": "tgt-demo-0017", "asset_id": "ast-demo-0005", "period": iso_month(-1), "income_target": 520000},
+        {"id": "tgt-demo-0018", "asset_id": "ast-demo-0005", "period": iso_month(0), "income_target": 550000},
+    ]
+    db.executemany(
+        """
+        INSERT OR IGNORE INTO asset_monthly_targets (
+            id, asset_id, period, income_target, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (t["id"], t["asset_id"], t["period"], t["income_target"], iso_date(0), iso_date(0))
+            for t in monthly_targets
+        ],
+    )
 
 
 def seed_employees(db):

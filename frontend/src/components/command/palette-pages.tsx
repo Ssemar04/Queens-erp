@@ -40,6 +40,7 @@ export const PAGES: PageDef[] = [
   { label: "Employees", path: "/app/employees", icon: <UserSquare2 className="h-4 w-4" /> },
   { label: "Chatroom", path: "/app/chat", icon: <MessageSquare className="h-4 w-4" /> },
   { label: "Assets", path: "/app/assets", icon: <Boxes className="h-4 w-4" /> },
+  { label: "Purchases", path: "/app/purchases", icon: <ShoppingCart className="h-4 w-4" /> },
   { label: "Reports", path: "/app/reports", icon: <FileBarChart2 className="h-4 w-4" /> },
 
   { label: "Suppliers", path: "/app/suppliers", icon: <Truck className="h-4 w-4" /> },

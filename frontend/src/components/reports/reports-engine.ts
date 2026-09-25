@@ -123,7 +123,7 @@ function depreciationForRange(assets: Asset[], r: DateRange): number {
   const toMs = new Date(r.to).getTime();
   const years = Math.max(0, (toMs - fromMs) / (365 * 86400_000));
   return assets.reduce((s, a) => {
-    const annual = (a.purchaseCost - a.salvageValue) / Math.max(1, a.usefulLifeYears);
+    const annual = (a.purchaseCost - (a.salvageValue ?? 0)) / Math.max(1, a.usefulLifeYears);
     return s + annual * years;
   }, 0);
 }
@@ -265,9 +265,9 @@ export function buildSalesAgingSummary(sales: ReportSale[]) {
 // ----- Asset register -----
 export function buildAssetRegister(assets: Asset[]) {
   return assets.map((a) => ({
-    Tag: a.tag, Name: a.name, Category: a.category, Location: a.location,
+    Tag: a.tag, Name: a.name, Category: a.category, Location: a.location || "—",
     "Purchase date": a.purchaseDate, "Purchase cost": a.purchaseCost,
-    "Book value": Math.round(bookValue(a)), Status: a.status, Condition: a.condition,
+    "Book value": Math.round(bookValue(a)), Status: a.status, Condition: a.condition || "—",
     "Last service": a.lastServiceDate ?? "—",
   }));
 }

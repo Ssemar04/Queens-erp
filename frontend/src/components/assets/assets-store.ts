@@ -11,6 +11,7 @@ import {
   getNextAssetTag,
   addAssetIncome as addAssetIncomeApi,
   deleteAssetIncome as deleteAssetIncomeApi,
+  createExpense,
 } from "@/services/api";
 
 export type AssetStatus = "active" | "idle" | "maintenance" | "retired";
@@ -49,6 +50,22 @@ export interface AssetIncome {
   updatedAt?: string;
 }
 
+export interface AssetConsumable {
+  id: string;
+  name: string;
+  unit: string;
+  dateReplaced: string;
+  quantity: number;
+  replacedBy?: string;
+  reason?: string;
+}
+
+export interface AssetMonthlyTarget {
+  id: string;
+  period: string;
+  incomeTarget?: number;
+}
+
 export interface Asset {
   id: string;
   tag: string;
@@ -77,6 +94,8 @@ export interface Asset {
   meterReadings: MeterReading[];
   services: ServiceRecord[];
   income: AssetIncome[];
+  consumables: AssetConsumable[];
+  monthlyTargets: AssetMonthlyTarget[];
   createdAt: string;
   updatedAt: string;
 }
@@ -117,7 +136,17 @@ export function useAssetsStore() {
       setReady(false);
       try {
         const fetchedAssets = await getAssets();
-        if (!cancelled) setAssets(fetchedAssets);
+        if (!cancelled) {
+          const normalized: Asset[] = (fetchedAssets ?? []).map((a: Asset) => ({
+            ...a,
+            consumables: Array.isArray(a.consumables) ? a.consumables : [],
+            monthlyTargets: Array.isArray(a.monthlyTargets) ? a.monthlyTargets : [],
+            income: Array.isArray(a.income) ? a.income : [],
+            meterReadings: Array.isArray(a.meterReadings) ? a.meterReadings : [],
+            services: Array.isArray(a.services) ? a.services : [],
+          }));
+          setAssets(normalized);
+        }
       } catch {
         if (!cancelled) toast.error("Could not load assets");
       } finally {
@@ -192,8 +221,84 @@ export function useAssetsStore() {
       setAssets((current) =>
         current.map((a) => (a.id === id ? updatedAsset : a)),
       );
+      try {
+        if (s.cost && s.cost > 0) {
+          const asset = updatedAsset as Asset;
+          const now = new Date().toISOString().slice(0, 10);
+          await createExpense({
+            date: s.date || now,
+            type: "employee",
+            employee: s.performedBy || asset.staff || "System",
+            department: "Operations",
+            amount: Number(s.cost) || 0,
+            currency: "UGX",
+            paymentMethod: "petty_cash",
+            description: `${s.type ? s.type.charAt(0).toUpperCase() + s.type.slice(1) : "Asset"} service — ${asset.name}${s.notes ? ` · ${s.notes}` : ""}`,
+            attachment: null,
+            status: "paid",
+            reimbursable: false,
+            reimbursed: false,
+            approvedBy: null,
+            rejectedReason: null,
+          });
+        }
+      } catch (err) {
+        toast.warning("Service logged; expense sync skipped");
+      }
     },
     [assertCanUseBackend],
+  );
+
+  const addConsumable = useCallback(
+    (id: string, c: Omit<AssetConsumable, "id">) => {
+      const row: AssetConsumable = { id: crypto.randomUUID(), ...c };
+      setAssets((current) =>
+        current.map((a) => a.id === id ? { ...a, consumables: [...(a.consumables ?? []), row], updatedAt: new Date().toISOString() } : a),
+      );
+      return row;
+    },
+    [],
+  );
+
+  const updateConsumable = useCallback(
+    (assetId: string, consumableId: string, patch: Partial<AssetConsumable>) => {
+      setAssets((current) =>
+        current.map((a) => a.id === assetId
+          ? { ...a, consumables: (a.consumables ?? []).map((c) => c.id === consumableId ? { ...c, ...patch } : c), updatedAt: new Date().toISOString() }
+          : a),
+      );
+    },
+    [],
+  );
+
+  const removeConsumable = useCallback(
+    (assetId: string, consumableId: string) => {
+      setAssets((current) =>
+        current.map((a) => a.id === assetId
+          ? { ...a, consumables: (a.consumables ?? []).filter((c) => c.id !== consumableId), updatedAt: new Date().toISOString() }
+          : a),
+      );
+    },
+    [],
+  );
+
+  const setMonthlyTarget = useCallback(
+    (id: string, t: Omit<AssetMonthlyTarget, "id">) => {
+      setAssets((current) =>
+        current.map((a) => {
+          if (a.id !== id) return a;
+          const existing = (a.monthlyTargets ?? []).find((m) => m.period === t.period);
+          let updatedTargets: AssetMonthlyTarget[];
+          if (existing) {
+            updatedTargets = (a.monthlyTargets ?? []).map((m) => m.period === t.period ? { ...m, ...t } : m);
+          } else {
+            updatedTargets = [...(a.monthlyTargets ?? []), { id: crypto.randomUUID(), ...t }];
+          }
+          return { ...a, monthlyTargets: updatedTargets, updatedAt: new Date().toISOString() };
+        }),
+      );
+    },
+    [],
   );
 
   const addIncome = useCallback(
@@ -233,6 +338,10 @@ export function useAssetsStore() {
     addService,
     addIncome,
     removeIncome,
+    addConsumable,
+    updateConsumable,
+    removeConsumable,
+    setMonthlyTarget,
   };
 }
 

@@ -3,7 +3,12 @@ import sqlite3
 
 from flask import Blueprint, request, jsonify
 
-from models.serializers import asset_from_record, asset_income_from_row
+from models.serializers import (
+    asset_from_record,
+    asset_income_from_row,
+    asset_consumable_from_row,
+    asset_monthly_target_from_row,
+)
 from services.assets_service import (
     get_assets,
     get_asset,
@@ -17,6 +22,12 @@ from services.assets_service import (
     add_asset_income,
     update_asset_income,
     delete_asset_income,
+    list_consumables,
+    add_consumable,
+    delete_consumable,
+    get_monthly_targets,
+    upsert_monthly_target,
+    delete_monthly_target,
 )
 
 assets_bp = Blueprint("assets", __name__, url_prefix="/api/assets")
@@ -147,4 +158,71 @@ def delete_asset_income_route(asset_id, income_id):
     rows = delete_asset_income(asset_id, income_id)
     if rows == 0:
         return jsonify({"error": "Income record not found"}), 404
+    return "", 204
+
+
+@assets_bp.route("/<asset_id>/consumables", methods=["GET"])
+def list_consumables_route(asset_id):
+    if not get_asset(asset_id):
+        return jsonify({"error": "Asset not found"}), 404
+    rows = list_consumables(asset_id)
+    if rows is None:
+        return jsonify({"error": "Asset not found"}), 404
+    return jsonify([asset_consumable_from_row(r) for r in rows])
+
+
+@assets_bp.route("/<asset_id>/consumables", methods=["POST"])
+def create_consumable_route(asset_id):
+    data = request.get_json(silent=True) or {}
+    missing = [f for f in ("dateReplaced",) if f not in data or data.get(f) in (None, "")]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+    try:
+        row = add_consumable(asset_id, data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    if not row:
+        return jsonify({"error": "Asset not found"}), 404
+    return jsonify(asset_consumable_from_row(row)), 201
+
+
+@assets_bp.route("/<asset_id>/consumables/<consumable_id>", methods=["DELETE"])
+def delete_consumable_route(asset_id, consumable_id):
+    rows = delete_consumable(asset_id, consumable_id)
+    if rows == 0:
+        return jsonify({"error": "Consumable record not found"}), 404
+    return "", 204
+
+
+@assets_bp.route("/<asset_id>/monthly-targets", methods=["GET"])
+def get_monthly_targets_route(asset_id):
+    if not get_asset(asset_id):
+        return jsonify({"error": "Asset not found"}), 404
+    rows = get_monthly_targets(asset_id)
+    if rows is None:
+        return jsonify({"error": "Asset not found"}), 404
+    return jsonify([asset_monthly_target_from_row(r) for r in rows])
+
+
+@assets_bp.route("/<asset_id>/monthly-targets", methods=["POST"])
+def upsert_monthly_target_route(asset_id):
+    data = request.get_json(silent=True) or {}
+    period = data.get("period")
+    missing_period = not period
+    if missing_period:
+        return jsonify({"error": "Missing required field: period"}), 400
+    try:
+        row = upsert_monthly_target(asset_id, period, data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    if not row:
+        return jsonify({"error": "Asset not found"}), 404
+    return jsonify(asset_monthly_target_from_row(row)), 201
+
+
+@assets_bp.route("/<asset_id>/monthly-targets/<period>", methods=["DELETE"])
+def delete_monthly_target_route(asset_id, period):
+    rows = delete_monthly_target(asset_id, period)
+    if rows == 0:
+        return jsonify({"error": "Monthly target not found"}), 404
     return "", 204

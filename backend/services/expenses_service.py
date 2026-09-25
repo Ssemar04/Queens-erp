@@ -113,7 +113,13 @@ def next_reference():
         LIMIT 1
         """
     ).fetchone()
-    last = int(row["reference"].replace("EXP-", "")) if row else 2400
+    if row and row["reference"]:
+        try:
+            last = int(row["reference"].replace("EXP-", ""))
+        except ValueError:
+            last = 2400
+    else:
+        last = 2400
     return f"EXP-{last + 1:05d}"
 
 

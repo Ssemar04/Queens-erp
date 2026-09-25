@@ -629,8 +629,42 @@ def asset_income_from_row(row):
     }
 
 
+def asset_consumable_from_row(row):
+    def get(col, default=None):
+        try:
+            val = row[col]
+            return val if val is not None else default
+        except (KeyError, IndexError):
+            return default
+
+    return {
+        "id": row["id"],
+        "name": get("name", "") or "",
+        "unit": get("unit", "") or "",
+        "dateReplaced": row["date_replaced"],
+        "quantity": int(get("quantity", 1) or 1),
+        "replacedBy": get("replaced_by", "") or "",
+        "reason": get("reason", "") or "",
+    }
+
+
+def asset_monthly_target_from_row(row):
+    def get(col, default=None):
+        try:
+            val = row[col]
+            return val if val is not None else default
+        except (KeyError, IndexError):
+            return default
+
+    return {
+        "id": row["id"],
+        "period": row["period"],
+        "incomeTarget": float(get("income_target", 0) or 0),
+    }
+
+
 def asset_from_record(record):
-    row, readings, services, income = record
+    row, readings, services, income, consumables, monthly_targets = record
 
     def get(col, default=None):
         try:
@@ -649,6 +683,7 @@ def asset_from_record(record):
         "model": get("model", "") or "",
         "location": get("location", "") or "",
         "assignedTo": get("assigned_to", "") or "",
+        "staff": get("staff", "") or "",
         "purchaseDate": row["purchase_date"],
         "purchaseCost": float(get("purchase_cost", 0) or 0),
         "salvageValue": float(get("salvage_value", 0) or 0),
@@ -666,6 +701,8 @@ def asset_from_record(record):
         "meterReadings": [asset_meter_reading_from_row(r) for r in readings],
         "services": [asset_service_record_from_row(s) for s in services],
         "income": [asset_income_from_row(i) for i in income],
+        "consumables": [asset_consumable_from_row(c) for c in consumables],
+        "monthlyTargets": [asset_monthly_target_from_row(t) for t in monthly_targets],
         "createdAt": row["created_at"],
         "updatedAt": row["updated_at"],
     }
@@ -805,4 +842,36 @@ def chat_message_from_row(row):
         "replyTo": row["reply_to"],
         "edited": bool(row["edited"]),
         "pinned": bool(row["pinned"]),
+    }
+
+
+def purchase_from_row(row):
+    def get(col, default=None):
+        try:
+            return row[col]
+        except (KeyError, IndexError):
+            return default
+
+    return {
+        "id": row["id"],
+        "purchaseNumber": row["purchase_number"],
+        "supplierName": row["supplier_name"],
+        "supplierId": get("supplier_id"),
+        "purchaseDate": row["purchase_date"],
+        "expectedDeliveryDate": get("expected_delivery_date"),
+        "category": get("category", "Inventory"),
+        "itemsSummary": get("items_summary", ""),
+        "subtotal": float(get("subtotal") or 0),
+        "taxAmount": float(get("tax_amount") or 0),
+        "discountAmount": float(get("discount_amount") or 0),
+        "totalAmount": float(get("total_amount") or 0),
+        "paidAmount": float(get("paid_amount") or 0),
+        "paymentStatus": get("payment_status", "unpaid"),
+        "orderStatus": get("order_status", "received"),
+        "paymentMethod": get("payment_method", "bank_transfer"),
+        "purchasedBy": get("purchased_by", ""),
+        "notes": get("notes", ""),
+        "attachment": get("attachment"),
+        "createdAt": row["created_at"],
+        "updatedAt": get("updated_at", row["created_at"]),
     }

@@ -10,7 +10,9 @@ def current_timestamp():
 
 
 def _asset_record(row):
-    readings = get_db().execute(
+    db = get_db()
+
+    readings = db.execute(
         """
         SELECT * FROM asset_meter_readings
         WHERE asset_id = ?
@@ -19,7 +21,7 @@ def _asset_record(row):
         (row["id"],),
     ).fetchall()
 
-    services = get_db().execute(
+    services = db.execute(
         """
         SELECT * FROM asset_service_records
         WHERE asset_id = ?
@@ -28,7 +30,7 @@ def _asset_record(row):
         (row["id"],),
     ).fetchall()
 
-    income = get_db().execute(
+    income = db.execute(
         """
         SELECT * FROM asset_income
         WHERE asset_id = ?
@@ -37,7 +39,25 @@ def _asset_record(row):
         (row["id"],),
     ).fetchall()
 
-    return row, readings, services, income
+    consumables = db.execute(
+        """
+        SELECT * FROM asset_consumables
+        WHERE asset_id = ?
+        ORDER BY date_replaced DESC, created_at DESC
+        """,
+        (row["id"],),
+    ).fetchall()
+
+    monthly_targets = db.execute(
+        """
+        SELECT * FROM asset_monthly_targets
+        WHERE asset_id = ?
+        ORDER BY period DESC
+        """,
+        (row["id"],),
+    ).fetchall()
+
+    return row, readings, services, income, consumables, monthly_targets
 
 
 def get_assets():
@@ -69,11 +89,11 @@ def create_asset(asset_data):
         """
         INSERT INTO assets (
             id, tag, name, category, serial_number, manufacturer, model, location,
-            assigned_to, purchase_date, purchase_cost, salvage_value, useful_life_years,
+            assigned_to, staff, purchase_date, purchase_cost, salvage_value, useful_life_years,
             status, condition, meter_unit, service_interval_meter, service_interval_days,
             last_service_date, last_service_meter, warranty_expiry, insurance_expiry,
             notes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             asset_id,
@@ -85,6 +105,7 @@ def create_asset(asset_data):
             asset_data.get("model", ""),
             asset_data.get("location", ""),
             asset_data.get("assignedTo", ""),
+            asset_data.get("staff", ""),
             asset_data["purchaseDate"],
             asset_data.get("purchaseCost", 0),
             asset_data.get("salvageValue", 0),
@@ -115,7 +136,7 @@ def update_asset(asset_id, asset_data):
 
     allowed_fields = [
         "tag", "name", "category", "serialNumber", "manufacturer", "model", "location",
-        "assignedTo", "purchaseDate", "purchaseCost", "salvageValue", "usefulLifeYears",
+        "assignedTo", "staff", "purchaseDate", "purchaseCost", "salvageValue", "usefulLifeYears",
         "status", "condition", "meterUnit", "serviceIntervalMeter", "serviceIntervalDays",
         "lastServiceDate", "lastServiceMeter", "warrantyExpiry", "insuranceExpiry", "notes",
     ]
@@ -344,6 +365,128 @@ def delete_asset_income(asset_id, income_id):
     cursor = db.execute(
         "DELETE FROM asset_income WHERE id = ? AND asset_id = ?",
         (income_id, asset_id)
+    )
+    if cursor.rowcount == 0:
+        return 0
+    db.execute("UPDATE assets SET updated_at = ? WHERE id = ?", (current_timestamp(), asset_id))
+    db.commit()
+    return cursor.rowcount
+
+
+def list_consumables(asset_id):
+    db = get_db()
+    if not get_asset(asset_id):
+        return None
+    return db.execute(
+        """
+        SELECT * FROM asset_consumables
+        WHERE asset_id = ?
+        ORDER BY date_replaced DESC, created_at DESC
+        """,
+        (asset_id,),
+    ).fetchall()
+
+
+def add_consumable(asset_id, data):
+    db = get_db()
+    if not get_asset(asset_id):
+        return None
+    consumable_id = data.get("id") or str(uuid.uuid4())
+    now = current_timestamp()
+    db.execute(
+        """
+        INSERT INTO asset_consumables (
+            id, asset_id, name, unit, date_replaced, quantity, replaced_by, reason, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            consumable_id,
+            asset_id,
+            data.get("name", ""),
+            data.get("unit", ""),
+            data["dateReplaced"],
+            int(data.get("quantity", 1) or 1),
+            data.get("replacedBy", ""),
+            data.get("reason", ""),
+            now,
+        ),
+    )
+    db.execute("UPDATE assets SET updated_at = ? WHERE id = ?", (now, asset_id))
+    db.commit()
+    return db.execute("SELECT * FROM asset_consumables WHERE id = ?", (consumable_id,)).fetchone()
+
+
+def delete_consumable(asset_id, consumable_id):
+    db = get_db()
+    if not get_asset(asset_id):
+        return 0
+    cursor = db.execute(
+        "DELETE FROM asset_consumables WHERE id = ? AND asset_id = ?",
+        (consumable_id, asset_id),
+    )
+    if cursor.rowcount == 0:
+        return 0
+    db.execute("UPDATE assets SET updated_at = ? WHERE id = ?", (current_timestamp(), asset_id))
+    db.commit()
+    return cursor.rowcount
+
+
+def get_monthly_targets(asset_id):
+    db = get_db()
+    if not get_asset(asset_id):
+        return None
+    return db.execute(
+        """
+        SELECT * FROM asset_monthly_targets
+        WHERE asset_id = ?
+        ORDER BY period DESC
+        """,
+        (asset_id,),
+    ).fetchall()
+
+
+def upsert_monthly_target(asset_id, period, data):
+    db = get_db()
+    if not get_asset(asset_id):
+        return None
+    now = current_timestamp()
+    target_id = data.get("id") or str(uuid.uuid4())
+    income_target = float(data.get("incomeTarget", 0) or 0)
+    existing = db.execute(
+        "SELECT id FROM asset_monthly_targets WHERE asset_id = ? AND period = ?",
+        (asset_id, period),
+    ).fetchone()
+    if existing:
+        target_id = existing["id"]
+        db.execute(
+            """
+            UPDATE asset_monthly_targets
+            SET income_target = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (income_target, now, target_id),
+        )
+    else:
+        db.execute(
+            """
+            INSERT INTO asset_monthly_targets (
+                id, asset_id, period, income_target, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (target_id, asset_id, period, income_target, now, now),
+        )
+    db.execute("UPDATE assets SET updated_at = ? WHERE id = ?", (now, asset_id))
+    db.commit()
+    return db.execute("SELECT * FROM asset_monthly_targets WHERE id = ?", (target_id,)).fetchone()
+
+
+def delete_monthly_target(asset_id, period):
+    db = get_db()
+    if not get_asset(asset_id):
+        return 0
+    cursor = db.execute(
+        "DELETE FROM asset_monthly_targets WHERE asset_id = ? AND period = ?",
+        (asset_id, period),
     )
     if cursor.rowcount == 0:
         return 0

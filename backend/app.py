@@ -20,6 +20,7 @@ from routes.assets_routes import assets_bp
 from routes.employees_routes import employees_bp
 from routes.chat_routes import chat_bp
 from routes.loyalty_tiers_routes import loyalty_tiers_bp
+from routes.purchases_routes import purchases_bp
 from services.database import close_db, init_db, migrate_db
 
 
@@ -126,6 +127,7 @@ def create_app():
     app.register_blueprint(employees_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(loyalty_tiers_bp)
+    app.register_blueprint(purchases_bp)
 
     print("Initializing database...", file=sys.stderr)
     with app.app_context():

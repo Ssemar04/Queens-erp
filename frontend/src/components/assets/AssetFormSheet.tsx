@@ -22,6 +22,7 @@ interface Props {
 export type AssetDraft = Omit<
   Asset,
   "id" | "tag" | "createdAt" | "updatedAt" | "meterReadings" | "services" | "income"
+  | "manufacturer" | "location" | "assignedTo" | "salvageValue" | "condition" | "insuranceExpiry"
 >;
 
 export const DEFAULT_ASSET_CATEGORIES = [
@@ -72,7 +73,6 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
     serviceIntervalMeter: 5000,
     serviceIntervalDays: 90,
     staff: "",
-    assignedTo: "",
     warrantyExpiry: "",
     notes: "",
   });
@@ -87,12 +87,15 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
 
   useEffect(() => {
     if (initial) {
-      const { id: _i, tag: _t, createdAt: _c, updatedAt: _u, meterReadings: _r, services: _s, income: _in, ...rest } = initial;
-      const staffVal = initial.staff || initial.assignedTo || "";
+      const {
+        id: _i, tag: _t, createdAt: _c, updatedAt: _u, meterReadings: _r, services: _s, income: _in,
+        manufacturer: _mf, location: _loc, assignedTo: _at, salvageValue: _sv, condition: _co, insuranceExpiry: _ie,
+        ...rest
+      } = initial;
+      const staffVal = initial.staff || "";
       setF({
         ...rest,
         staff: staffVal,
-        assignedTo: staffVal,
       });
     } else {
       setF({
@@ -108,7 +111,6 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
         serviceIntervalMeter: 5000,
         serviceIntervalDays: 90,
         staff: "",
-        assignedTo: "",
         warrantyExpiry: "",
         notes: "",
       });
@@ -149,12 +151,8 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
       toast.error("Asset name is required");
       return;
     }
-    const payload = {
-      ...f,
-      assignedTo: f.staff || f.assignedTo || "",
-    };
-    if (initial && onUpdate) onUpdate(initial.id, payload);
-    else onSubmit(payload);
+    if (initial && onUpdate) onUpdate(initial.id, { ...f });
+    else onSubmit({ ...f });
     onOpenChange(false);
   }
 
@@ -286,44 +284,13 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
               </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Warranty expiry">
-                <Input
-                  type="date"
-                  value={f.warrantyExpiry ?? ""}
-                  onChange={(e) => setF({ ...f, warrantyExpiry: e.target.value })}
-                />
-              </Field>
-
-              <Field label="Staff">
-                <div className="space-y-1.5">
-                  <Select
-                    value={staffList.some((s) => s.name === f.staff) ? f.staff : (f.staff ? "custom" : "")}
-                    onValueChange={(val) => {
-                      if (val === "custom") return;
-                      setF({ ...f, staff: val, assignedTo: val });
-                    }}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger>
-                    <SelectContent>
-                      {staffList.map((emp) => (
-                        <SelectItem key={emp.id || emp.name} value={emp.name}>
-                          {emp.name} {emp.role ? `(${emp.role})` : ""}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="custom">-- Write custom staff --</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {(!staffList.some((s) => s.name === f.staff) || f.staff === "" || !staffList.length) && (
-                    <Input
-                      placeholder="Enter staff member name"
-                      value={f.staff || ""}
-                      onChange={(e) => setF({ ...f, staff: e.target.value, assignedTo: e.target.value })}
-                    />
-                  )}
-                </div>
-              </Field>
-            </div>
+            <Field label="Warranty expiry">
+              <Input
+                type="date"
+                value={f.warrantyExpiry ?? ""}
+                onChange={(e) => setF({ ...f, warrantyExpiry: e.target.value })}
+              />
+            </Field>
 
             <Field label="Notes">
               <Textarea
@@ -334,11 +301,55 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
               />
             </Field>
 
+            <div className="rounded-xl border border-dashed border-[#003399]/25 bg-gradient-to-br from-[#003399]/[0.04] to-transparent p-4">
+              <Field
+                label={
+                  <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-[#003399]/10 text-[#003399]">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </span>
+                    Assigned staff
+                  </div>
+                }
+              >
+                <div className="space-y-1.5">
+                  <Select
+                    value={staffList.some((s) => s.name === f.staff) ? f.staff : (f.staff ? "custom" : "")}
+                    onValueChange={(val) => {
+                      if (val === "custom") return;
+                      setF({ ...f, staff: val });
+                    }}
+                  >
+                    <SelectTrigger className="bg-white"><SelectValue placeholder="Select the staff member responsible" /></SelectTrigger>
+                    <SelectContent>
+                      {staffList.map((emp) => (
+                        <SelectItem key={emp.id || emp.name} value={emp.name}>
+                          {emp.name} {emp.role ? `(${emp.role})` : ""}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom">-- Write custom staff name --</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(!staffList.some((s) => s.name === f.staff) || f.staff === "" || !staffList.length) && (
+                    <Input
+                      placeholder="Or enter a staff name manually..."
+                      value={f.staff || ""}
+                      onChange={(e) => setF({ ...f, staff: e.target.value })}
+                      className="bg-white"
+                    />
+                  )}
+                </div>
+              </Field>
+            </div>
+
             <div className="flex justify-end gap-2 pt-3 border-t border-border">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={submit}>
+              <Button
+                onClick={submit}
+                className="bg-gradient-to-br from-[#003399] via-[#003399] to-[#004CCC] text-white shadow-[0_4px_14px_-4px_rgba(0,51,153,0.55)] hover:brightness-105 active:scale-[0.98] transition-all"
+              >
                 {initial ? "Save changes" : "Create asset"}
               </Button>
             </div>

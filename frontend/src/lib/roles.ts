@@ -27,6 +27,7 @@ export const ALL_SYSTEM_MODULES: SystemModule[] = [
   { id: "employees", name: "Employees", path: "/app/employees", group: "Workplace & Procurement", description: "Staff directory & access control" },
   { id: "chat", name: "Chatroom", path: "/app/chat", group: "Workplace & Procurement", description: "Internal staff team chat" },
   { id: "assets", name: "Assets", path: "/app/assets", group: "Workplace & Procurement", description: "Company hardware & asset registry" },
+  { id: "purchases", name: "Purchases", path: "/app/purchases", group: "Workplace & Procurement", description: "Company purchase orders & vendor procurement" },
   { id: "suppliers", name: "Supplies", path: "/app/suppliers", group: "Workplace & Procurement", description: "Vendor & purchase orders" },
   { id: "reports", name: "Reports", path: "/app/reports", group: "Workplace & Procurement", description: "Business analytics & export reports" },
 

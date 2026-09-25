@@ -34,7 +34,7 @@ function AssetsPage() {
     if (status !== "all" && a.status !== status) return false;
     if (q.trim()) {
       const s = q.toLowerCase();
-      return [a.name, a.tag, a.serialNumber, a.manufacturer, a.model, a.staff, a.assignedTo, a.location]
+      return [a.name, a.tag, a.serialNumber, a.model, a.staff]
         .filter((v): v is string => Boolean(v))
         .some((v) => v.toLowerCase().includes(s));
     }
@@ -138,7 +138,7 @@ function AssetsPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{a.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{a.tag} · {a.location} · due {nextServiceDueDate(a) ?? "—"}</p>
+                  <p className="text-[11px] text-muted-foreground">{a.tag} · {a.category} · due {nextServiceDueDate(a) ?? "—"}</p>
                 </div>
                 <div className="w-40">
                   <Progress value={Math.min(100, h.pressure * 100)} className={cn("h-1.5", h.state === "overdue" && "[&>div]:bg-rose-600", h.state === "due_soon" && "[&>div]:bg-amber-500")} />
@@ -225,7 +225,7 @@ function AssetsPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm"><div>{a.staff || a.assignedTo || "Unassigned"}</div></TableCell>
+                  <TableCell className="text-sm"><div>{a.staff || "Unassigned"}</div></TableCell>
                   <TableCell className="text-right font-mono text-sm">{currentMeter(a).toLocaleString()} <span className="text-[10px] text-muted-foreground">{a.meterUnit}</span></TableCell>
                   <TableCell className="text-right font-mono text-sm">{fmtKES(bookValue(a))}</TableCell>
                   <TableCell>
@@ -256,7 +256,19 @@ function AssetsPage() {
       </div>
 
       <AssetFormSheet open={showForm} onOpenChange={setShowForm} initial={editing} onSubmit={store.addAsset} onUpdate={store.updateAsset} />
-      <AssetDetailSheet open={detail !== null} onOpenChange={(v) => !v && setDetail(null)} asset={detail} onAddReading={store.addReading} onAddService={store.addService} onAddIncome={store.addIncome} onRemoveIncome={store.removeIncome} />
+      <AssetDetailSheet
+        open={detail !== null}
+        onOpenChange={(v) => !v && setDetail(null)}
+        asset={detail}
+        onAddReading={store.addReading}
+        onAddService={store.addService}
+        onAddIncome={store.addIncome}
+        onRemoveIncome={store.removeIncome}
+        onAddConsumable={store.addConsumable}
+        onUpdateConsumable={store.updateConsumable}
+        onRemoveConsumable={store.removeConsumable}
+        onSetMonthlyTarget={store.setMonthlyTarget}
+      />
     </div>
   );
 }

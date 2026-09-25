@@ -738,6 +738,54 @@ export const deleteAssetIncome = async (assetId: string, incomeId: string): Prom
   await api.delete(`/assets/${assetId}/income/${incomeId}`);
 };
 
+export interface Purchase {
+  id: string;
+  purchaseNumber: string;
+  supplierName: string;
+  supplierId?: string;
+  purchaseDate: string;
+  expectedDeliveryDate?: string;
+  category: string;
+  itemsSummary: string;
+  subtotal: number;
+  taxAmount: number;
+  discountAmount: number;
+  totalAmount: number;
+  paidAmount: number;
+  paymentStatus: "unpaid" | "partially_paid" | "paid";
+  orderStatus: "draft" | "ordered" | "received" | "cancelled";
+  paymentMethod: string;
+  purchasedBy?: string;
+  notes?: string;
+  attachment?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const getPurchases = async (): Promise<Purchase[]> => {
+  const response = await api.get("/purchases");
+  return response.data;
+};
+
+export const getNextPurchaseNumber = async (): Promise<string> => {
+  const response = await api.get("/purchases/next-number");
+  return response.data.purchaseNumber;
+};
+
+export const createPurchase = async (p: Partial<Purchase>): Promise<Purchase> => {
+  const response = await api.post("/purchases", p);
+  return response.data;
+};
+
+export const updatePurchase = async (id: string, patch: Partial<Purchase>): Promise<Purchase> => {
+  const response = await api.patch(`/purchases/${id}`, patch);
+  return response.data;
+};
+
+export const deletePurchase = async (id: string): Promise<void> => {
+  await api.delete(`/purchases/${id}`);
+};
+
 export const getEmployees = async (): Promise<Employee[]> => {
   const response = await api.get("/employees");
   return response.data;
