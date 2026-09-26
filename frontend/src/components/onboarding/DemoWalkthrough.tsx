@@ -18,12 +18,15 @@ interface Props {
 }
 
 export function DemoWalkthrough({ active, onClose }: Props) {
+  if (!active) return null;
+  return <DemoWalkthroughBody active={active} onClose={onClose} />;
+}
+
+function DemoWalkthroughBody({ active: _active, onClose }: Props) {
   const [step, setStep] = useState(0);
   const [minimized, setMinimized] = useState(false);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-
-  if (!active) return null;
 
   const current = STEPS[step];
   const progress = ((step + 1) / STEPS.length) * 100;

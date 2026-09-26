@@ -65,6 +65,21 @@ function tenure(joined: string) {
 }
 
 export function EmployeeDetailSheet({ employee, onClose, onEdit, onDelete, onAccountUpdated }: Props) {
+  if (!employee) return null;
+  return (
+    <EmployeeDetailSheetBody
+      employee={employee}
+      onClose={onClose}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      onAccountUpdated={onAccountUpdated}
+    />
+  );
+}
+
+function EmployeeDetailSheetBody({
+  employee, onClose, onEdit, onDelete, onAccountUpdated,
+}: Props & { employee: NonNullable<Props["employee"]> }) {
   const { branches } = useBranch();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [credentials, setCredentials] = useState<EmployeeOneTimeCredentials | null>(null);
@@ -155,7 +170,6 @@ ${credentials.oneTimePassword ? `One-Time Password: ${credentials.oneTimePasswor
     }
   };
 
-  if (!employee) return null;
   const e = employee;
   const roleInfo = getRoleInfo(e.role);
 

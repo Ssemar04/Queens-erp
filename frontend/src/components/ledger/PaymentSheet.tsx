@@ -18,6 +18,13 @@ interface Props {
 }
 
 export function PaymentSheet({ entry, open, onOpenChange, onPay }: Props) {
+  if (!entry) return null;
+  return <PaymentSheetBody entry={entry} open={open} onOpenChange={onOpenChange} onPay={onPay} />;
+}
+
+function PaymentSheetBody({
+  entry, open, onOpenChange, onPay,
+}: Props & { entry: NonNullable<Props["entry"]> }) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [method, setMethod] = useState<Payment["method"]>("mpesa");
@@ -34,7 +41,6 @@ export function PaymentSheet({ entry, open, onOpenChange, onPay }: Props) {
     }
   }, [open, entry]);
 
-  if (!entry) return null;
   const bal = balance(entry);
   const num = Number(amount);
   const valid = num > 0 && num <= bal;

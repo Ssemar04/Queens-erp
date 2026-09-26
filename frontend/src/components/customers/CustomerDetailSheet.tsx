@@ -25,24 +25,29 @@ const INTERACTION_ICON = {
   call: PhoneCall, email: Mail, meeting: Calendar, order: TrendingUp, note: MessageSquare,
 } as const;
 
-export function CustomerDetailSheet({
-  customer,
-  open,
-  onOpenChange,
-  onEdit,
-  onDelete,
-  onLogInteraction,
-}: {
+interface CustomerDetailSheetProps {
   customer: Customer | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
   onLogInteraction: (i: CustomerInteraction) => void;
-}) {
-  const [noteText, setNoteText] = useState("");
+}
 
-  if (!customer) return null;
+export function CustomerDetailSheet(props: CustomerDetailSheetProps) {
+  if (!props.customer) return null;
+  return <CustomerDetailSheetBody {...props} customer={props.customer} />;
+}
+
+function CustomerDetailSheetBody({
+  customer,
+  open,
+  onOpenChange,
+  onEdit,
+  onDelete,
+  onLogInteraction,
+}: CustomerDetailSheetProps & { customer: NonNullable<CustomerDetailSheetProps["customer"]> }) {
+  const [noteText, setNoteText] = useState("");
 
   const tier = TIER_META[customer.tier];
   const creditUsed = customer.creditLimit > 0

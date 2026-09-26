@@ -22,11 +22,6 @@ function ExpensesPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
 
-  if (!store.ready) return <div className="w-full h-32 animate-pulse rounded-xl bg-muted/50" />;
-
-  const openNew = () => { setEditing(null); setOpen(true); };
-  const openEdit = (e: Expense) => { setEditing(e); setOpen(true); };
-
   const overview = useMemo(() => {
     const total = store.expenses.reduce((s, e) => s + (e.amount || 0), 0);
     const approved = store.expenses.filter((e) => e.status === "approved").reduce((s, e) => s + (e.amount || 0), 0);
@@ -37,6 +32,11 @@ function ExpensesPage() {
       .reduce((s, e) => s + (e.amount || 0), 0);
     return { total, approved, pending, count: store.expenses.length, thisMonthTotal };
   }, [store.expenses]);
+
+  if (!store.ready) return <div className="w-full h-32 animate-pulse rounded-xl bg-muted/50" />;
+
+  const openNew = () => { setEditing(null); setOpen(true); };
+  const openEdit = (e: Expense) => { setEditing(e); setOpen(true); };
 
   const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
 

@@ -13,7 +13,13 @@ interface Props {
   onComplete: () => void;
 }
 
-export function OnboardingTour({ steps, currentStep, isActive, onNext, onBack, onSkip, onComplete }: Props) {
+export function OnboardingTour(props: Props) {
+  const step = props.steps[props.currentStep];
+  if (!props.isActive || !step) return null;
+  return <OnboardingTourBody {...props} />;
+}
+
+function OnboardingTourBody({ steps, currentStep, isActive, onNext, onBack, onSkip, onComplete }: Props) {
   const [pos, setPos] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -36,8 +42,6 @@ export function OnboardingTour({ steps, currentStep, isActive, onNext, onBack, o
       el.style.zIndex = "";
     };
   }, [isActive, step, currentStep]);
-
-  if (!isActive || !step) return null;
 
   const handleNext = () => {
     if (isLast) onComplete();

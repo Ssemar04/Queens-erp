@@ -102,18 +102,18 @@ export function LedgerPage({ kind }: Props) {
       .slice(0, 3);
   }, [entries]);
 
-  const totalOpen = kpis.outstanding || 1;
-
-  if (!ready) {
-    return <div className="w-full h-32 animate-pulse rounded-xl bg-muted/50" />;
-  }
-
   const newThisWeek = useMemo(() => {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const iso = weekAgo.toISOString().slice(0, 10);
     return entries.filter((e) => (e.createdAt || "").slice(0, 10) >= iso).length;
   }, [entries]);
+
+  const totalOpen = kpis.outstanding || 1;
+
+  if (!ready) {
+    return <div className="w-full h-32 animate-pulse rounded-xl bg-muted/50" />;
+  }
 
   const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
   const HeroIcon = isDebtor ? ArrowDownToLine : ArrowUpFromLine;

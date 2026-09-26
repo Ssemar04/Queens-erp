@@ -24,13 +24,13 @@ function SettingsPage() {
     }
   }, [can, navigate]);
 
-  if (!can("access_settings")) return null;
-
-  const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
-
   const settingsMeta = useMemo(() => ({
     modules: 14,
   }), []);
+
+  if (!can("access_settings")) return null;
+
+  const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
 
   return (
     <div className="w-full min-w-0 space-y-6">

@@ -25,9 +25,24 @@ export function OneTimeCredentialsModal({
   employeeName,
   credentials,
 }: OneTimeCredentialsModalProps) {
-  const [copied, setCopied] = useState(false);
-
   if (!credentials) return null;
+  return (
+    <OneTimeCredentialsModalBody
+      open={open}
+      onOpenChange={onOpenChange}
+      employeeName={employeeName}
+      credentials={credentials}
+    />
+  );
+}
+
+function OneTimeCredentialsModalBody({
+  open,
+  onOpenChange,
+  employeeName,
+  credentials,
+}: OneTimeCredentialsModalProps & { credentials: NonNullable<OneTimeCredentialsModalProps["credentials"]> }) {
+  const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
     const textToCopy = `System Login Credentials for ${employeeName}:

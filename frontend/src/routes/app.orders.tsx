@@ -139,17 +139,24 @@ function nextLpo(orders: SalesOrder[]): string {
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-function DeclineReasonDialog({
-  order,
-  open,
-  onOpenChange,
-  onConfirm,
-}: {
+interface DeclineReasonDialogProps {
   order: SalesOrder | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (reason: string) => void;
-}) {
+}
+
+function DeclineReasonDialog(props: DeclineReasonDialogProps) {
+  if (!props.order) return null;
+  return <DeclineReasonDialogBody {...props} order={props.order} />;
+}
+
+function DeclineReasonDialogBody({
+  order,
+  open,
+  onOpenChange,
+  onConfirm,
+}: DeclineReasonDialogProps & { order: NonNullable<DeclineReasonDialogProps["order"]> }) {
   const [reason, setReason] = useState("");
 
   useEffect(() => {
@@ -159,8 +166,6 @@ function DeclineReasonDialog({
       setReason("");
     }
   }, [order]);
-
-  if (!order) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

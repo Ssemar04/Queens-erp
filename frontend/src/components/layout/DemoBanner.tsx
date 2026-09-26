@@ -18,11 +18,19 @@ const roles: { value: UserRoleType; label: string }[] = [
 
 export function DemoBanner() {
   const { isDemo } = useDemo();
-  const { role, setDemoRole } = useRole();
   const [dismissed, setDismissed] = useState(false);
-
   if (!isDemo || dismissed) return null;
+  return <DemoBannerBody dismissed={dismissed} setDismissed={setDismissed} />;
+}
 
+function DemoBannerBody({
+  dismissed: _dismissed,
+  setDismissed,
+}: {
+  dismissed: boolean;
+  setDismissed: (v: boolean) => void;
+}) {
+  const { role, setDemoRole } = useRole();
   const currentLabel = roles.find((r) => r.value === role)?.label ?? "Admin";
 
   return (

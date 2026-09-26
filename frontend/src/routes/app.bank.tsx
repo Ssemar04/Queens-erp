@@ -18,6 +18,14 @@ export const Route = createFileRoute("/app/bank")({
 function BankPage() {
   const store = useBankStore();
 
+  const overview = useMemo(() => {
+    const totalBalance = store.accounts.reduce((s, a) => s + a.balance, 0);
+    const inflow = store.txns.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+    const outflow = store.txns.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+    const unreconciled = store.txns.filter((t) => !t.reconciled).length;
+    return { totalBalance, inflow, outflow, unreconciled, accounts: store.accounts.length };
+  }, [store.accounts, store.txns]);
+
   if (!store.ready) {
     return <div className="w-full h-32 animate-pulse rounded-xl bg-muted/50" />;
   }
@@ -38,14 +46,6 @@ function BankPage() {
     ];
     await store.importStatement(accountId, lines);
   }
-
-  const overview = useMemo(() => {
-    const totalBalance = store.accounts.reduce((s, a) => s + a.balance, 0);
-    const inflow = store.txns.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-    const outflow = store.txns.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
-    const unreconciled = store.txns.filter((t) => !t.reconciled).length;
-    return { totalBalance, inflow, outflow, unreconciled, accounts: store.accounts.length };
-  }, [store.accounts, store.txns]);
 
   const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
 

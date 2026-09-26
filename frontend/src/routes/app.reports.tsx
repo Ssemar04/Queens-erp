@@ -101,12 +101,7 @@ function ReportsPage() {
 
   const categoriesById = useMemo(() => new Map<string, string>(), []);
 
-  const ready = bank.ready && debtors.ready && creditors.ready && exp.ready && assets.ready && !movementsLoading;
-  if (!ready) return <div className="w-full h-32 animate-pulse rounded-xl bg-muted/50" />;
-
-  const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
   const groups = Array.from(new Set(REPORTS.map((r) => r.group)));
-  const meta = REPORTS.find((r) => r.key === active)!;
 
   const reportingOverview = useMemo(() => {
     const salesTotal = sales.reduce((s, r) => s + r.totalAmount, 0);
@@ -120,6 +115,12 @@ function ReportsPage() {
       assetsBook: assets.assets.reduce((s, a) => s + (a.bookValue || 0), 0),
     };
   }, [sales, exp.expenses, assets.assets, groups.length]);
+
+  const ready = bank.ready && debtors.ready && creditors.ready && exp.ready && assets.ready && !movementsLoading;
+  if (!ready) return <div className="w-full h-32 animate-pulse rounded-xl bg-muted/50" />;
+
+  const sectionIndex = (key: string) => Math.max(0, ["hero"].indexOf(key));
+  const meta = REPORTS.find((r) => r.key === active)!;
 
   return (
     <div className="w-full min-w-0 space-y-5">

@@ -103,7 +103,12 @@ function DetailRow({ label, value, mono }: DetailRowProps) {
   );
 }
 
-export function ItemDetailSheet({
+export function ItemDetailSheet(props: ItemDetailSheetProps) {
+  if (!props.item) return null;
+  return <ItemDetailSheetBody {...props} item={props.item} />;
+}
+
+function ItemDetailSheetBody({
   open,
   onOpenChange,
   item,
@@ -111,7 +116,7 @@ export function ItemDetailSheet({
   suppliers,
   onEdit,
   onArchive,
-}: ItemDetailSheetProps) {
+}: ItemDetailSheetProps & { item: NonNullable<ItemDetailSheetProps["item"]> }) {
   const queryClient = useQueryClient();
   const { data: allMovements = [] } = useMovements();
   const updateItem = useUpdateItem();
@@ -161,8 +166,6 @@ export function ItemDetailSheet({
 
   const totalUnitsSold = useMemo(() => itemSales.reduce((acc, curr) => acc + curr.quantity, 0), [itemSales]);
   const totalSalesRevenue = useMemo(() => itemSales.reduce((acc, curr) => acc + curr.totalAmount, 0), [itemSales]);
-
-  if (!item) return null;
 
   const category = categories.find((c) => c.id === item.categoryId);
   const supplier = suppliers.find((s) => s.id === item.supplierId);
