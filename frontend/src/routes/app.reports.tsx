@@ -112,7 +112,7 @@ function ReportsPage() {
       salesCount: sales.length,
       salesTotal,
       expTotal,
-      assetsBook: assets.assets.reduce((s, a) => s + (a.bookValue || 0), 0),
+      assetsBook: assets.assets.reduce((s, a) => s + (a.purchaseCost || 0), 0),
     };
   }, [sales, exp.expenses, assets.assets, groups.length]);
 

@@ -136,6 +136,24 @@ export interface Supplier {
 export type PaymentMethod = "cash" | "card" | "mobile" | "bank_transfer" | "credit";
 export type TransactionStatus = "paid" | "partial" | "pending" | "void";
 
+export type LargeFormatSaleSpec = { kind: "large_format"; widthM: number; heightM: number }
+export type DigitalPrinterSaleSpec = { kind: "digital_printer"; pages: number }
+export type FargoSaleSpec = { kind: "fargo"; sideMode: "single" | "double"; laminated: boolean }
+export type AssetSaleCategorySpec = LargeFormatSaleSpec | DigitalPrinterSaleSpec | FargoSaleSpec
+
+export function formatAssetSaleSpec(spec?: AssetSaleCategorySpec | null | undefined): string {
+  if (spec == null) return "";
+  switch (spec.kind) {
+    case "large_format":
+      return `${spec.widthM} × ${spec.heightM} m = ${(spec.widthM * spec.heightM).toFixed(2)} m²`;
+    case "digital_printer":
+      return `${spec.pages} pages`;
+    case "fargo":
+      const side = spec.sideMode === "double" ? "Double" : "Single";
+      return `${side} side${spec.laminated ? ", Laminated" : ""}`;
+  }
+}
+
 export interface SaleItem {
   itemId: string | null;
   itemName: string;
@@ -147,6 +165,8 @@ export interface SaleItem {
   vatRate: number;
   assetId?: string | null;
   assetName?: string | null;
+  assetCategory?: string | null;
+  assetCategorySpec?: AssetSaleCategorySpec | null;
   lineTotal: number;
 }
 

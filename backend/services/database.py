@@ -761,15 +761,6 @@ def init_branch_db_tables(db):
             FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE SET NULL
         );
 
-        for col_def in [
-            ("required_document_types", "TEXT"),
-            ("account_details", "TEXT"),
-            ("is_lpo_account", "INTEGER DEFAULT 0"),
-        ]:
-            try:
-                db.execute(f"ALTER TABLE sales_orders ADD COLUMN {col_def[0]} {col_def[1]}")
-            except Exception:
-                pass
 
         CREATE TABLE IF NOT EXISTS sales_order_items (
             id TEXT PRIMARY KEY,
@@ -1141,7 +1132,13 @@ def init_branch_db_tables(db):
             (tier_id, name, min_p, max_p, color)
         )
     ensure_performance_indexes(db)
-    add_missing_columns(db, "sales_orders", [("decline_reason", "TEXT"), ("complaints", "TEXT")])
+    add_missing_columns(db, "sales_orders", [
+        ("decline_reason", "TEXT"),
+        ("complaints", "TEXT"),
+        ("required_document_types", "TEXT"),
+        ("account_details", "TEXT"),
+        ("is_lpo_account", "INTEGER DEFAULT 0"),
+    ])
     add_missing_columns(db, "bank_transactions", [("performed_by", "TEXT NOT NULL DEFAULT ''")])
     add_missing_columns(db, "assets", [("staff", "TEXT NOT NULL DEFAULT ''")])
     db.commit()
@@ -1173,6 +1170,7 @@ def migrate_db():
     for branch in branches:
         branch_db = get_branch_db(branch["id"])
         init_branch_db_tables(branch_db)
+        seed_suppliers(branch_db)
         seed_expenses(branch_db)
         seed_purchases(branch_db)
 
@@ -1333,6 +1331,26 @@ def seed_expenses(db):
         VALUES (?, ?, ?, ?, ?, ?)
         """,
         audit,
+    )
+
+
+def seed_suppliers(db):
+    if db.execute("SELECT COUNT(*) AS count FROM suppliers").fetchone()["count"] > 0:
+        return
+
+    today = datetime.now(timezone.utc).isoformat()
+    suppliers = [
+        ("sup_1", "Kampala Tech Suppliers", "Mukasa John", "sales@kampalatech.co.ug", "+256 772 100 200", "Plot 12 Jinja Road, Kampala", 3, 4.8, 1, "Primary IT supplier", today, today),
+        ("sup_2", "Crown Logistics & Spares", "Akurut Mary", "orders@crownlogistics.co.ug", "+256 701 334 556", "Industrial Area, Kampala", 5, 4.5, 1, "Machinery & motor parts", today, today),
+        ("sup_3", "Stationery Hub Uganda", "Kato Paul", "info@stationeryhub.co.ug", "+256 782 990 112", "Nasser Road, Kampala", 2, 4.7, 1, "Office consumables & paper", today, today),
+    ]
+    db.executemany(
+        """
+        INSERT OR IGNORE INTO suppliers (
+            id, name, contact_name, email, phone, address, lead_time_days, rating, is_active, notes, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        suppliers,
     )
 
 

@@ -100,6 +100,58 @@ export interface Asset {
   updatedAt: string;
 }
 
+export const ASSET_CATEGORIES: string[] = [
+  "Large format (UV, DTF)",
+  "Digital Printer",
+  "Fargo",
+  "Computer & Accessories",
+  "Mobile devices",
+  "Non printers",
+  "Entertainment",
+  "Others",
+];
+
+export type AssetCategoryKind =
+  | "large_format"
+  | "digital_printer"
+  | "fargo"
+  | "default";
+
+export const ASSET_CATEGORY_KIND: Record<string, AssetCategoryKind> = {
+  "Large format (UV, DTF)": "large_format",
+  "Digital Printer": "digital_printer",
+  "Fargo": "fargo",
+};
+
+export function getAssetCategoryKind(
+  category: string | undefined | null,
+): AssetCategoryKind {
+  if (!category) return "default";
+  return ASSET_CATEGORY_KIND[category] ?? "default";
+}
+
+export type AssetCategoryTint = "emerald" | "blue" | "violet" | "gray";
+
+export function getAssetCategoryTint(
+  category: string | undefined | null,
+): AssetCategoryTint {
+  const kind = getAssetCategoryKind(category);
+  switch (kind) {
+    case "large_format":
+      return "emerald";
+    case "digital_printer":
+      return "blue";
+    case "fargo":
+      return "violet";
+    default:
+      return "gray";
+  }
+}
+
+export function isStandardAssetCategory(cat: string): boolean {
+  return ASSET_CATEGORIES.includes(cat);
+}
+
 const COLORS = ["#0EA5E9", "#10B981", "#F59E0B", "#6366F1", "#EC4899", "#14B8A6"];
 export const CATEGORY_COLOR = (cat: string) =>
   COLORS[Math.abs(hash(cat)) % COLORS.length];

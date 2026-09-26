@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Sheet,
   SheetContent,
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -19,8 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Check, Receipt, User, CreditCard, Package, Boxes, Search, Sparkles, X, Plus, Minus, Trash2, ShoppingCart, FileText } from "lucide-react";
-import { MovementType, type SaleItem } from "@/types/inventory";
+import { Check, Receipt, User, CreditCard, Package, Boxes, Search, Sparkles, X, Plus, Minus, Trash2, ShoppingCart, FileText, Ruler, Printer, CreditCard as CardIcon, Layers } from "lucide-react";
+import { MovementType, type SaleItem, type AssetSaleCategorySpec, formatAssetSaleSpec } from "@/types/inventory";
+import { getAssetCategoryKind, getAssetCategoryTint } from "@/components/assets/assets-store";
 import type {
   Item,
   StockMovement,
@@ -114,7 +117,32 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [lineItems, setLineItems] = useState<CartLineItem[]>([]);
 
+  const [lfWidth, setLfWidth] = useState("");
+  const [lfHeight, setLfHeight] = useState("");
+  const [dpPages, setDpPages] = useState("");
+  const [fgSideMode, setFgSideMode] = useState<"single" | "double">("single");
+  const [fgLaminated, setFgLaminated] = useState(false);
+
   const selected = items.find((i) => i.id === itemId);
+  const selectedAsset = useMemo(
+    () => (assetId !== "__none__" ? assetsStore.assets.find((a) => a.id === assetId) ?? null : null),
+    [assetsStore.assets, assetId],
+  );
+  const selectedAssetKind = getAssetCategoryKind(selectedAsset?.category);
+  const selectedAssetTint = getAssetCategoryTint(selectedAsset?.category);
+
+  function resetCategoryInputs() {
+    setLfWidth("");
+    setLfHeight("");
+    setDpPages("");
+    setFgSideMode("single");
+    setFgLaminated(false);
+  }
+
+  useEffect(() => {
+    resetCategoryInputs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetId]);
   const activeStaff = useMemo(() => {
     const list = employees.filter((e) => {
       const statusOk = !e.status || e.status.toLowerCase() === "active" || e.status.toLowerCase() === "probation";
@@ -164,6 +192,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       setEmail("");
       setErrors({});
       setLineItems([]);
+      resetCategoryInputs();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, currentBranchId, authenticatedUserName]);
@@ -266,7 +295,18 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
     }
   }
 
-  const qty = Math.max(0, parseInt(quantity, 10) || 0);
+  const baseQty = Math.max(0, parseInt(quantity, 10) || 0);
+  const lfW = parseFloat(lfWidth) || 0;
+  const lfH = parseFloat(lfHeight) || 0;
+  const lfArea = lfW > 0 && lfH > 0 ? lfW * lfH : 0;
+  const dpNum = parseInt(dpPages, 10) || 0;
+
+  const qty =
+    selectedAssetKind === "large_format"
+      ? lfArea
+      : selectedAssetKind === "digital_printer"
+      ? dpNum
+      : baseQty;
   const price = Math.max(0, parseFloat(unitPrice) || 0);
   const disc = Math.max(0, parseFloat(discount) || 0);
   const lineVat = vatEnabled ? Math.max(0, qty * price - disc) * VAT_RATE : 0;
@@ -326,7 +366,13 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
   function addLineItem() {
     const lineErrors: Record<string, string> = {};
     if (!itemSearch.trim()) lineErrors.itemId = "Item is required";
-    if (qty <= 0) lineErrors.quantity = "Quantity must be greater than 0";
+    if (selectedAssetKind === "large_format") {
+      if (lfW <= 0 || lfH <= 0) lineErrors.quantity = "Enter width and height in meters";
+    } else if (selectedAssetKind === "digital_printer") {
+      if (dpNum <= 0) lineErrors.quantity = "Enter number of pages";
+    } else {
+      if (qty <= 0) lineErrors.quantity = "Quantity must be greater than 0";
+    }
     if (selected && qty > selected.currentStock)
       lineErrors.quantity = `Only ${selected.currentStock} in stock`;
     if (price <= 0) lineErrors.unitPrice = "Unit price required";
@@ -338,7 +384,16 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
 
     const lineTotal = Math.max(0, qty * price - disc) + lineVat;
     const saleItemName = selected?.name ?? itemSearch.trim();
-    const linkedAsset = assetId !== "__none__" ? assetsStore.assets.find((a) => a.id === assetId) : null;
+    const linkedAsset = selectedAsset;
+
+    let assetCategorySpec: AssetSaleCategorySpec | null = null;
+    if (selectedAssetKind === "large_format" && lfW > 0 && lfH > 0) {
+      assetCategorySpec = { kind: "large_format", widthM: lfW, heightM: lfH };
+    } else if (selectedAssetKind === "digital_printer" && dpNum > 0) {
+      assetCategorySpec = { kind: "digital_printer", pages: dpNum };
+    } else if (selectedAssetKind === "fargo") {
+      assetCategorySpec = { kind: "fargo", sideMode: fgSideMode, laminated: fgLaminated };
+    }
 
     const newItem: CartLineItem = {
       tempId: crypto.randomUUID(),
@@ -352,12 +407,13 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
       vatRate: vatEnabled ? VAT_RATE : 0,
       assetId: linkedAsset?.id ?? null,
       assetName: linkedAsset?.name ?? null,
+      assetCategory: linkedAsset?.category ?? null,
+      assetCategorySpec,
       lineTotal,
     };
 
     setLineItems([...lineItems, newItem]);
     setErrors({});
-    // Reset item inputs
     setItemId("");
     setItemSearch("");
     setItemDescription("");
@@ -366,6 +422,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
     setDiscount("0");
     setAssetId("__none__");
     setVatEnabled(false);
+    resetCategoryInputs();
   }
 
   function removeLineItem(tempId: string) {
@@ -421,7 +478,19 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
 
     const customerName = customer.trim() || WALK_IN;
     const createdAt = new Date().toISOString();
-    const linkedAsset = assetId !== "__none__" ? assetsStore.assets.find((a) => a.id === assetId) : null;
+    const linkedAsset = selectedAsset;
+
+    let finalAssetCategorySpec: AssetSaleCategorySpec | null = null;
+    if (!lineItems.length) {
+      const assetKind = getAssetCategoryKind(linkedAsset?.category);
+      if (assetKind === "large_format" && lfW > 0 && lfH > 0) {
+        finalAssetCategorySpec = { kind: "large_format", widthM: lfW, heightM: lfH };
+      } else if (assetKind === "digital_printer" && dpNum > 0) {
+        finalAssetCategorySpec = { kind: "digital_printer", pages: dpNum };
+      } else if (assetKind === "fargo") {
+        finalAssetCategorySpec = { kind: "fargo", sideMode: fgSideMode, laminated: fgLaminated };
+      }
+    }
 
     // Determine final line items to save: either cart or single current item
     let finalLineItems: SaleItem[];
@@ -440,6 +509,8 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
         vatRate: vatEnabled ? VAT_RATE : 0,
         assetId: linkedAsset?.id ?? null,
         assetName: linkedAsset?.name ?? null,
+        assetCategory: linkedAsset?.category ?? null,
+        assetCategorySpec: finalAssetCategorySpec,
         lineTotal,
       }];
     }
@@ -593,19 +664,72 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
               <Label className="mb-1.5 flex items-center gap-1.5 text-sm">
                 <Boxes className="h-3.5 w-3.5 text-muted-foreground" /> Asset (optional)
               </Label>
-              <Select value={assetId} onValueChange={setAssetId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Link to asset" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— None —</SelectItem>
-                  {assetsStore.assets.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.tag} · {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Select value={assetId} onValueChange={setAssetId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Link to asset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
+                    {assetsStore.assets.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        <div className="flex items-center gap-2 min-w-0 w-full pr-8">
+                          <span className="truncate">{a.tag} · {a.name}</span>
+                          <span
+                            className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                              getAssetCategoryTint(a.category) === "emerald"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-500/20"
+                                : getAssetCategoryTint(a.category) === "blue"
+                                ? "bg-blue-50 text-blue-700 border border-blue-500/20"
+                                : getAssetCategoryTint(a.category) === "violet"
+                                ? "bg-violet-50 text-violet-700 border border-violet-500/20"
+                                : "bg-muted/60 text-muted-foreground border border-border"
+                            }`}
+                          >
+                            {a.category}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <AnimatePresence mode="wait">
+                  {selectedAsset && (
+                    <motion.div
+                      key={selectedAsset.id}
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.22, ease: [0.25, 0.8, 0.25, 1] }}
+                      className="flex items-center gap-2 rounded-md border border-dashed border-primary/25 bg-gradient-to-br from-primary/[0.05] to-transparent px-3 py-2"
+                    >
+                      <span
+                        className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-[11px] font-bold ${
+                          selectedAssetTint === "emerald"
+                            ? "bg-emerald-500/15 text-emerald-700"
+                            : selectedAssetTint === "blue"
+                            ? "bg-blue-500/15 text-blue-700"
+                            : selectedAssetTint === "violet"
+                            ? "bg-violet-500/15 text-violet-700"
+                            : "bg-muted/70 text-muted-foreground"
+                        }`}
+                      >
+                        {selectedAssetTint === "emerald"
+                          ? <Ruler className="h-3.5 w-3.5" />
+                          : selectedAssetTint === "blue"
+                          ? <Printer className="h-3.5 w-3.5" />
+                          : selectedAssetTint === "violet"
+                          ? <CardIcon className="h-3.5 w-3.5" />
+                          : <Layers className="h-3.5 w-3.5" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold text-foreground">{selectedAsset.name}</p>
+                        <p className="truncate text-[10px] text-muted-foreground font-mono">{selectedAsset.tag} · {selectedAsset.model}</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -614,12 +738,307 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                 <Input type="number" min={0} step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
                 {errors.unitPrice && <p className="mt-1 text-xs text-destructive">{errors.unitPrice}</p>}
               </div>
-              <div>
-                <Label className="mb-1.5 block text-sm">Quantity</Label>
-                <Input type="number" min={1} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-                {errors.quantity && <p className="mt-1 text-xs text-destructive">{errors.quantity}</p>}
-              </div>
+
+              {selectedAssetKind === "large_format" ? (
+                <div className="col-span-1">
+                  {/* replaced by dedicated controls below */}
+                </div>
+              ) : selectedAssetKind === "digital_printer" ? (
+                <div className="col-span-1">
+                  {/* replaced by dedicated controls below */}
+                </div>
+              ) : selectedAssetKind === "fargo" ? (
+                <div className="col-span-1">
+                  {/* replaced by dedicated controls below */}
+                </div>
+              ) : (
+                <div>
+                  <Label className="mb-1.5 block text-sm">Quantity</Label>
+                  <Input type="number" min={1} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                  {errors.quantity && <p className="mt-1 text-xs text-destructive">{errors.quantity}</p>}
+                </div>
+              )}
             </div>
+
+            <AnimatePresence mode="wait">
+              {selectedAsset && selectedAssetKind !== "default" && (
+                <motion.div
+                  key={`cat-${selectedAsset.id}-${selectedAssetKind}`}
+                  initial={{ opacity: 0, y: -8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
+                  transition={{ duration: 0.28, ease: [0.25, 0.8, 0.25, 1] }}
+                  className={`overflow-hidden rounded-xl border p-3.5 space-y-3 ${
+                    selectedAssetTint === "emerald"
+                      ? "border-emerald-500/25 bg-emerald-50/40 shadow-[0_1px_0_0_rgba(16,185,129,0.1)]"
+                      : selectedAssetTint === "blue"
+                      ? "border-blue-500/25 bg-blue-50/40 shadow-[0_1px_0_0_rgba(14,165,233,0.1)]"
+                      : selectedAssetTint === "violet"
+                      ? "border-violet-500/25 bg-violet-50/40 shadow-[0_1px_0_0_rgba(139,92,246,0.1)]"
+                      : "border-border bg-muted/30"
+                  }`}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.02 }}
+                    className="flex items-center gap-2"
+                  >
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${
+                        selectedAssetTint === "emerald"
+                          ? "bg-emerald-500/15 text-emerald-800 ring-1 ring-emerald-500/20"
+                          : selectedAssetTint === "blue"
+                          ? "bg-blue-500/15 text-blue-800 ring-1 ring-blue-500/20"
+                          : "bg-violet-500/15 text-violet-800 ring-1 ring-violet-500/20"
+                      }`}
+                    >
+                      {selectedAssetTint === "emerald"
+                        ? <><Ruler className="h-3 w-3" /> Area pricing</>
+                        : selectedAssetTint === "blue"
+                        ? <><Printer className="h-3 w-3" /> Pages pricing</>
+                        : <><CardIcon className="h-3 w-3" /> Badge printing</>}
+                    </span>
+                  </motion.div>
+
+                  {selectedAssetKind === "large_format" && (
+                    <div className="space-y-3">
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.06 }}
+                        className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end"
+                      >
+                        <div>
+                          <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-emerald-800/70">Width (m)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="e.g. 1.5"
+                            value={lfWidth}
+                            onChange={(e) => setLfWidth(e.target.value)}
+                            className="h-9 bg-white focus-visible:ring-emerald-500/50"
+                          />
+                        </div>
+                        <div className="pb-1">
+                          <span className="inline-flex items-center rounded-md bg-muted/70 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground ring-1 ring-border/60">
+                            by
+                          </span>
+                        </div>
+                        <div>
+                          <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-emerald-800/70">Height (m)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="e.g. 2.0"
+                            value={lfHeight}
+                            onChange={(e) => setLfHeight(e.target.value)}
+                            className="h-9 bg-white focus-visible:ring-emerald-500/50"
+                          />
+                        </div>
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.12 }}
+                      >
+                        <div className={`flex items-center justify-between rounded-lg px-3 py-2 ring-1 ring-inset ${
+                          lfArea > 0
+                            ? "bg-emerald-100/70 ring-emerald-500/25"
+                            : "bg-white/60 ring-emerald-500/10"
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/20 text-emerald-800">
+                              <Ruler className="h-3 w-3" />
+                            </span>
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-800/80">
+                              Area
+                            </span>
+                          </div>
+                          <span className={`font-mono tabular-nums font-bold ${lfArea > 0 ? "text-emerald-900" : "text-emerald-800/50"}`}>
+                            {lfW > 0 && lfH > 0
+                              ? `${lfW} × ${lfH} m = ${lfArea.toFixed(2)} m²`
+                              : "— m²"}
+                          </span>
+                        </div>
+                        {errors.quantity && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -2 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-1.5 text-xs text-destructive"
+                          >
+                            {errors.quantity}
+                          </motion.p>
+                        )}
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {selectedAssetKind === "digital_printer" && (
+                    <div className="space-y-3">
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.06 }}
+                      >
+                        <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-blue-800/70">
+                          <Printer className="h-3 w-3" /> Page count
+                        </Label>
+                        <div className="flex items-stretch gap-2">
+                          <Input
+                            type="number"
+                            min={1}
+                            step={1}
+                            placeholder="Number of pages"
+                            value={dpPages}
+                            onChange={(e) => setDpPages(e.target.value)}
+                            className="h-9 bg-white focus-visible:ring-blue-500/50"
+                          />
+                          <span className="inline-flex items-center rounded-md bg-blue-500/15 px-3 text-xs font-bold uppercase tracking-[0.12em] text-blue-800 ring-1 ring-blue-500/20">
+                            pages
+                          </span>
+                        </div>
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.12 }}
+                      >
+                        <div className={`flex items-center justify-between rounded-lg px-3 py-2 ring-1 ring-inset ${
+                          dpNum > 0
+                            ? "bg-blue-100/70 ring-blue-500/25"
+                            : "bg-white/60 ring-blue-500/10"
+                        }`}>
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-800/80">
+                            Quantity
+                          </span>
+                          <span className={`font-mono tabular-nums font-bold ${dpNum > 0 ? "text-blue-900" : "text-blue-800/50"}`}>
+                            {dpNum > 0 ? `${dpNum} pages` : "— pages"}
+                          </span>
+                        </div>
+                        {errors.quantity && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -2 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-1.5 text-xs text-destructive"
+                          >
+                            {errors.quantity}
+                          </motion.p>
+                        )}
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {selectedAssetKind === "fargo" && (
+                    <div className="space-y-3">
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.04 }}
+                      >
+                        <Label className="mb-2 block text-xs font-medium uppercase tracking-wider text-violet-800/70">
+                          Side mode
+                        </Label>
+                        <RadioGroup
+                          value={fgSideMode}
+                          onValueChange={(v) => setFgSideMode(v as "single" | "double")}
+                          className="grid grid-cols-2 gap-2"
+                        >
+                          <div>
+                            <RadioGroupItem value="single" id="fg-single" className="peer sr-only" />
+                            <label
+                              htmlFor="fg-single"
+                              className="flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-all peer-data-[state=checked]:border-violet-500 peer-data-[state=checked]:bg-violet-500/15 peer-data-[state=checked]:text-violet-900 peer-data-[state=checked]:shadow-[0_0_0_1px_rgba(139,92,246,0.3)] border-border bg-white/70 text-muted-foreground hover:border-violet-500/50 hover:bg-violet-500/5"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-current" /> Single
+                            </label>
+                          </div>
+                          <div>
+                            <RadioGroupItem value="double" id="fg-double" className="peer sr-only" />
+                            <label
+                              htmlFor="fg-double"
+                              className="flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-all peer-data-[state=checked]:border-violet-500 peer-data-[state=checked]:bg-violet-500/15 peer-data-[state=checked]:text-violet-900 peer-data-[state=checked]:shadow-[0_0_0_1px_rgba(139,92,246,0.3)] border-border bg-white/70 text-muted-foreground hover:border-violet-500/50 hover:bg-violet-500/5"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-current" /> Double
+                            </label>
+                          </div>
+                        </RadioGroup>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.08 }}
+                      >
+                        <div className="flex items-center gap-2 rounded-md border border-border bg-white/70 px-3 py-2">
+                          <Checkbox
+                            id="fg-laminated"
+                            checked={fgLaminated}
+                            onCheckedChange={(c) => setFgLaminated(Boolean(c))}
+                            className="data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-500"
+                          />
+                          <label htmlFor="fg-laminated" className="flex-1 cursor-pointer text-xs font-semibold uppercase tracking-wider text-foreground">
+                            Laminated
+                          </label>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                              fgLaminated
+                                ? "bg-violet-500/15 text-violet-800 ring-1 ring-violet-500/25"
+                                : "bg-muted/70 text-muted-foreground"
+                            }`}
+                          >
+                            {fgLaminated ? "On" : "Off"}
+                          </span>
+                        </div>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="grid grid-cols-[1fr_1.2fr] gap-3 items-end"
+                      >
+                        <div>
+                          <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-violet-800/70">Badge qty</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={quantity}
+                            onChange={(e) => setQuantity(e.target.value)}
+                            className="h-9 bg-white focus-visible:ring-violet-500/50"
+                          />
+                        </div>
+                        <div className={`flex items-center justify-between rounded-lg px-3 py-2 ring-1 ring-inset h-9 ${
+                          baseQty > 0
+                            ? "bg-violet-100/70 ring-violet-500/25"
+                            : "bg-white/60 ring-violet-500/10"
+                        }`}>
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-800/70">Run</span>
+                          <span className={`font-mono tabular-nums font-bold text-xs ${baseQty > 0 ? "text-violet-900" : "text-violet-800/50"}`}>
+                            {fgSideMode === "double" ? "Double" : "Single"}
+                            {fgLaminated ? ", Lam" : ""}
+                            {baseQty > 0 ? ` · ×${baseQty}` : ""}
+                          </span>
+                        </div>
+                      </motion.div>
+
+                      {errors.quantity && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -2 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-xs text-destructive"
+                        >
+                          {errors.quantity}
+                        </motion.p>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="mb-1.5 block text-sm">Discount</Label>
@@ -648,47 +1067,73 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                 </div>
               </div>
               <div className="divide-y divide-border rounded-md border border-border">
-                {lineItems.map((li) => (
-                  <div key={li.tempId} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-foreground">{li.itemName}</p>
-                      {li.description && (
-                        <p className="truncate text-xs text-muted-foreground italic">{li.description}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {fmt(li.unitPrice)} × {li.quantity} · {fmt(li.lineTotal)}
-                      </p>
+                {lineItems.map((li) => {
+                  const liTint = getAssetCategoryTint(li.assetCategory ?? undefined);
+                  const liSpecText = formatAssetSaleSpec(li.assetCategorySpec);
+                  return (
+                    <div key={li.tempId} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          {li.assetCategory && (
+                            <span
+                              className={`inline-flex h-1.5 w-1.5 shrink-0 rounded-full ${
+                                liTint === "emerald"
+                                  ? "bg-emerald-500"
+                                  : liTint === "blue"
+                                  ? "bg-blue-500"
+                                  : liTint === "violet"
+                                  ? "bg-violet-500"
+                                  : "bg-gray-400"
+                              }`}
+                            />
+                          )}
+                          <p className="truncate font-medium text-foreground">{li.itemName}</p>
+                        </div>
+                        {li.description && (
+                          <p className="truncate text-xs text-muted-foreground italic">{li.description}</p>
+                        )}
+                        {li.assetCategory && (
+                          <p className="truncate text-[11px] text-muted-foreground">
+                            <span className="font-medium">{li.assetCategory}</span>
+                            {liSpecText ? <> · <span className="font-mono">{liSpecText}</span></> : null}
+                            {li.assetCategorySpec?.kind === "fargo" ? <> · ×{li.quantity}</> : null}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {fmt(li.unitPrice)} × {li.quantity} · {fmt(li.lineTotal)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateLineItemQuantity(li.tempId, -1)}
+                          disabled={li.quantity <= 1}
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="min-w-[28px] text-center font-mono text-sm">{li.quantity}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateLineItemQuantity(li.tempId, 1)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => removeLineItem(li.tempId)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => updateLineItemQuantity(li.tempId, -1)}
-                        disabled={li.quantity <= 1}
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </Button>
-                      <span className="min-w-[28px] text-center font-mono text-sm">{li.quantity}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => updateLineItemQuantity(li.tempId, 1)}
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => removeLineItem(li.tempId)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}

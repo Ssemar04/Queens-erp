@@ -1,15 +1,13 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { FolderPlus, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { getEmployees, type Employee } from "@/services/api";
-import type { Asset, AssetStatus, MeterUnit } from "./assets-store";
+import { ASSET_CATEGORIES, isStandardAssetCategory, type Asset, type AssetStatus, type MeterUnit } from "./assets-store";
 
 interface Props {
   open: boolean;
@@ -22,47 +20,16 @@ interface Props {
 export type AssetDraft = Omit<
   Asset,
   "id" | "tag" | "createdAt" | "updatedAt" | "meterReadings" | "services" | "income"
-  | "manufacturer" | "location" | "assignedTo" | "salvageValue" | "condition" | "insuranceExpiry"
 >;
-
-export const DEFAULT_ASSET_CATEGORIES = [
-  "Vehicle",
-  "Generator",
-  "Machinery",
-  "IT",
-  "Furniture",
-  "Equipment",
-  "Building",
-];
-
-export function getStoredAssetCategories(): string[] {
-  try {
-    const raw = localStorage.getItem("qterp_asset_categories_v1");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {}
-  return DEFAULT_ASSET_CATEGORIES;
-}
-
-export function saveStoredAssetCategories(cats: string[]): void {
-  try {
-    localStorage.setItem("qterp_asset_categories_v1", JSON.stringify(cats));
-  } catch {}
-}
 
 const UNITS: MeterUnit[] = ["km", "hours", "kwh", "litres", "cycles", "pages"];
 
 export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate }: Props) {
-  const [categories, setCategories] = useState<string[]>(getStoredAssetCategories);
-  const [manageCatOpen, setManageCatOpen] = useState(false);
-  const [newCatInput, setNewCatInput] = useState("");
   const [staffList, setStaffList] = useState<Employee[]>([]);
 
   const [f, setF] = useState<AssetDraft>({
     name: "",
-    category: categories[0] || "Equipment",
+    category: ASSET_CATEGORIES[0],
     serialNumber: "",
     model: "",
     purchaseDate: new Date().toISOString().slice(0, 10),
@@ -75,6 +42,8 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
     staff: "",
     warrantyExpiry: "",
     notes: "",
+    consumables: [],
+    monthlyTargets: [],
   });
 
   useEffect(() => {
@@ -89,18 +58,19 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
     if (initial) {
       const {
         id: _i, tag: _t, createdAt: _c, updatedAt: _u, meterReadings: _r, services: _s, income: _in,
-        manufacturer: _mf, location: _loc, assignedTo: _at, salvageValue: _sv, condition: _co, insuranceExpiry: _ie,
         ...rest
       } = initial;
       const staffVal = initial.staff || "";
       setF({
         ...rest,
         staff: staffVal,
+        consumables: initial.consumables || [],
+        monthlyTargets: initial.monthlyTargets || [],
       });
     } else {
       setF({
         name: "",
-        category: categories[0] || "Equipment",
+        category: ASSET_CATEGORIES[0],
         serialNumber: "",
         model: "",
         purchaseDate: new Date().toISOString().slice(0, 10),
@@ -113,38 +83,11 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
         staff: "",
         warrantyExpiry: "",
         notes: "",
+        consumables: [],
+        monthlyTargets: [],
       });
     }
   }, [initial, open]);
-
-  function handleAddCategory() {
-    const trimmed = newCatInput.trim();
-    if (!trimmed) return;
-    if (categories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
-      toast.error("Category already exists");
-      return;
-    }
-    const updated = [...categories, trimmed];
-    setCategories(updated);
-    saveStoredAssetCategories(updated);
-    setNewCatInput("");
-    setF((prev) => ({ ...prev, category: trimmed }));
-    toast.success(`Category "${trimmed}" added`);
-  }
-
-  function handleRemoveCategory(catToRemove: string) {
-    if (categories.length <= 1) {
-      toast.error("At least one category is required");
-      return;
-    }
-    const updated = categories.filter((c) => c !== catToRemove);
-    setCategories(updated);
-    saveStoredAssetCategories(updated);
-    if (f.category === catToRemove) {
-      setF((prev) => ({ ...prev, category: updated[0] }));
-    }
-    toast.success(`Category "${catToRemove}" removed`);
-  }
 
   function submit() {
     if (!f.name.trim()) {
@@ -157,8 +100,7 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
   }
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
           <SheetHeader>
             <SheetTitle>{initial ? "Edit asset" : "New asset"}</SheetTitle>
@@ -173,31 +115,20 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field
-                label={
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-wider text-muted-foreground">Category</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-5 px-1.5 text-[11px] font-medium text-primary hover:bg-primary/10 flex items-center gap-1"
-                      onClick={() => setManageCatOpen(true)}
-                    >
-                      <FolderPlus className="h-3 w-3" />
-                      Manage Category
-                    </Button>
-                  </div>
-                }
-              >
+              <Field label="Category">
                 <Select value={f.category} onValueChange={(v) => setF({ ...f, category: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {categories.map((c) => (
+                    {ASSET_CATEGORIES.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}
                       </SelectItem>
                     ))}
+                    {initial && initial.category && !isStandardAssetCategory(initial.category) && (
+                      <SelectItem key={initial.category} value={initial.category} disabled>
+                        {initial.category} (legacy)
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </Field>
@@ -356,70 +287,6 @@ export function AssetFormSheet({ open, onOpenChange, initial, onSubmit, onUpdate
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Manage Category Modal */}
-      <Dialog open={manageCatOpen} onOpenChange={setManageCatOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FolderPlus className="h-5 w-5 text-primary" />
-              Manage Asset Categories
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-xs text-muted-foreground">
-              Add new categories or delete existing ones. Changes persist for future assets.
-            </p>
-
-            <div className="flex gap-2">
-              <Input
-                placeholder="New category name..."
-                value={newCatInput}
-                onChange={(e) => setNewCatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddCategory();
-                  }
-                }}
-              />
-              <Button onClick={handleAddCategory} className="shrink-0">
-                <Plus className="mr-1 h-4 w-4" /> Add
-              </Button>
-            </div>
-
-            <div className="rounded-lg border border-border p-3 space-y-2 max-h-56 overflow-y-auto">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Current Categories ({categories.length})
-              </p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {categories.map((c) => (
-                  <div
-                    key={c}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium"
-                  >
-                    <span>{c}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveCategory(c)}
-                      className="text-muted-foreground hover:text-rose-600 transition-colors"
-                      title={`Remove ${c}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setManageCatOpen(false)}>
-              Done
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
 

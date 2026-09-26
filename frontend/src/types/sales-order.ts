@@ -14,6 +14,9 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  assetId?: string;
+  assetCategory?: string;
+  assetCategorySpec?: AssetCategorySpec | null;
 }
 
 export type SalesDocumentType =
@@ -63,6 +66,11 @@ export interface LpoAccountDetails {
   feeAmount?: number;
 }
 
+export type LargeFormatSpec = { kind: "large_format"; widthM: number; heightM: number }
+export type DigitalPrinterSpec = { kind: "digital_printer"; pages: number }
+export type FargoSpec = { kind: "fargo"; sideMode: "single" | "double"; laminated: boolean }
+export type AssetCategorySpec = LargeFormatSpec | DigitalPrinterSpec | FargoSpec
+
 export interface SalesOrder {
   id: string;
   lpoNumber: string;
@@ -85,4 +93,17 @@ export interface SalesOrder {
   isLpoAccount?: boolean;
   createdAt: string;
   updatedAt?: string;
+}
+
+export function formatAssetSpec(spec?: AssetCategorySpec | null | undefined): string {
+  if (spec == null) return "";
+  switch (spec.kind) {
+    case "large_format":
+      return `${spec.widthM} × ${spec.heightM} m = ${(spec.widthM * spec.heightM).toFixed(2)} m²`;
+    case "digital_printer":
+      return `${spec.pages} pages`;
+    case "fargo":
+      const side = spec.sideMode === "double" ? "Double" : "Single";
+      return `${side} side${spec.laminated ? ", Laminated" : ""}`;
+  }
 }

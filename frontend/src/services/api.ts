@@ -7,6 +7,7 @@ import type { SalesOrder, SalesOrderDocument } from "@/types/sales-order";
 import type { ItemFilters } from "@/lib/demo-store";
 import type { Asset, AssetIncome, MeterReading, ServiceRecord } from "@/components/assets/assets-store";
 import type { Employee, EmployeeDraft } from "@/components/employees/employees-store";
+export type { Employee, EmployeeDraft };
 import type { Attachment, Channel, ChatUser, Message, Reaction } from "@/components/chat/chat-store";
 
 const api = axios.create({

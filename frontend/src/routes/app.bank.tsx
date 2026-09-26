@@ -19,7 +19,7 @@ function BankPage() {
   const store = useBankStore();
 
   const overview = useMemo(() => {
-    const totalBalance = store.accounts.reduce((s, a) => s + a.balance, 0);
+    const totalBalance = store.accounts.reduce((s, a) => s + (a.currentBalance ?? 0), 0);
     const inflow = store.txns.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
     const outflow = store.txns.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
     const unreconciled = store.txns.filter((t) => !t.reconciled).length;
