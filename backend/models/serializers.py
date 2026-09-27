@@ -585,25 +585,39 @@ def customer_from_record(record):
 
 
 def asset_meter_reading_from_row(row):
+    def get(col, default=None):
+        try:
+            val = row[col]
+            return val if val is not None else default
+        except (KeyError, IndexError):
+            return default
+
     return {
         "id": row["id"],
-        "date": row["date"],
-        "value": row["value"],
-        "recordedBy": row["recorded_by"],
-        "note": row["note"],
+        "date": get("date", ""),
+        "value": get("value", 0),
+        "recordedBy": get("recorded_by", "") or "",
+        "note": get("note"),
     }
 
 
 def asset_service_record_from_row(row):
+    def get(col, default=None):
+        try:
+            val = row[col]
+            return val if val is not None else default
+        except (KeyError, IndexError):
+            return default
+
     return {
         "id": row["id"],
-        "date": row["date"],
-        "type": row["type"],
-        "performedBy": row["performed_by"],
-        "cost": row["cost"],
-        "notes": row["notes"],
-        "nextDueDate": row["next_due_date"],
-        "nextDueMeter": row["next_due_meter"],
+        "date": get("date", ""),
+        "type": get("type", "preventive") or "preventive",
+        "performedBy": get("performed_by", "") or "",
+        "cost": float(get("cost", 0) or 0),
+        "notes": get("notes", "") or "",
+        "nextDueDate": get("next_due_date"),
+        "nextDueMeter": get("next_due_meter"),
     }
 
 
@@ -675,21 +689,21 @@ def asset_from_record(record):
 
     return {
         "id": row["id"],
-        "tag": row["tag"],
-        "name": row["name"],
-        "category": row["category"],
+        "tag": get("tag", "") or "",
+        "name": get("name", "") or "",
+        "category": get("category", "") or "",
         "serialNumber": get("serial_number", "") or "",
         "manufacturer": get("manufacturer", "") or "",
         "model": get("model", "") or "",
         "location": get("location", "") or "",
         "assignedTo": get("assigned_to", "") or "",
         "staff": get("staff", "") or "",
-        "purchaseDate": row["purchase_date"],
+        "purchaseDate": get("purchase_date", "") or "",
         "purchaseCost": float(get("purchase_cost", 0) or 0),
         "salvageValue": float(get("salvage_value", 0) or 0),
         "usefulLifeYears": int(get("useful_life_years", 5) or 5),
-        "status": row["status"],
-        "condition": row["condition"],
+        "status": get("status", "active") or "active",
+        "condition": get("condition", "good") or "good",
         "meterUnit": get("meter_unit", "km") or "km",
         "serviceIntervalMeter": int(get("service_interval_meter", 0) or 0),
         "serviceIntervalDays": int(get("service_interval_days", 0) or 0),
@@ -703,8 +717,8 @@ def asset_from_record(record):
         "income": [asset_income_from_row(i) for i in income],
         "consumables": [asset_consumable_from_row(c) for c in consumables],
         "monthlyTargets": [asset_monthly_target_from_row(t) for t in monthly_targets],
-        "createdAt": row["created_at"],
-        "updatedAt": row["updated_at"],
+        "createdAt": get("created_at", "") or "",
+        "updatedAt": get("updated_at", "") or "",
     }
 
 

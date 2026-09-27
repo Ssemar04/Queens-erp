@@ -1140,7 +1140,27 @@ def init_branch_db_tables(db):
         ("is_lpo_account", "INTEGER DEFAULT 0"),
     ])
     add_missing_columns(db, "bank_transactions", [("performed_by", "TEXT NOT NULL DEFAULT ''")])
-    add_missing_columns(db, "assets", [("staff", "TEXT NOT NULL DEFAULT ''")])
+    add_missing_columns(db, "assets", [
+        ("staff", "TEXT NOT NULL DEFAULT ''"),
+        ("serial_number", "TEXT NOT NULL DEFAULT ''"),
+        ("manufacturer", "TEXT NOT NULL DEFAULT ''"),
+        ("model", "TEXT NOT NULL DEFAULT ''"),
+        ("location", "TEXT NOT NULL DEFAULT ''"),
+        ("assigned_to", "TEXT NOT NULL DEFAULT ''"),
+        ("purchase_cost", "REAL NOT NULL DEFAULT 0"),
+        ("salvage_value", "REAL NOT NULL DEFAULT 0"),
+        ("useful_life_years", "INTEGER NOT NULL DEFAULT 5"),
+        ("status", "TEXT NOT NULL DEFAULT 'active'"),
+        ("condition", "TEXT NOT NULL DEFAULT 'good'"),
+        ("meter_unit", "TEXT NOT NULL DEFAULT 'km'"),
+        ("service_interval_meter", "INTEGER NOT NULL DEFAULT 0"),
+        ("service_interval_days", "INTEGER NOT NULL DEFAULT 0"),
+        ("last_service_date", "TEXT"),
+        ("last_service_meter", "INTEGER"),
+        ("warranty_expiry", "TEXT"),
+        ("insurance_expiry", "TEXT"),
+        ("notes", "TEXT"),
+    ])
     db.commit()
 
 
