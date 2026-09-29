@@ -111,6 +111,45 @@ export const ASSET_CATEGORIES: string[] = [
   "Others",
 ];
 
+const ASSET_CATEGORIES_STORAGE_KEY = "qterp:asset-categories";
+
+let _mergedStored = false;
+export function mergeStoredCategories(): void {
+  if (_mergedStored) return;
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(ASSET_CATEGORIES_STORAGE_KEY);
+    if (!raw) { _mergedStored = true; return; }
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) { _mergedStored = true; return; }
+    for (const name of parsed) {
+      if (typeof name === "string" && name.trim() && !ASSET_CATEGORIES.includes(name.trim())) {
+        ASSET_CATEGORIES.push(name.trim());
+      }
+    }
+    _mergedStored = true;
+  } catch {
+    _mergedStored = true;
+  }
+}
+
+export function saveCategory(name: string): boolean {
+  mergeStoredCategories();
+  const trimmed = (name || "").trim();
+  if (!trimmed) return false;
+  if (!ASSET_CATEGORIES.includes(trimmed)) ASSET_CATEGORIES.push(trimmed);
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(ASSET_CATEGORIES_STORAGE_KEY, JSON.stringify(ASSET_CATEGORIES.slice(8)));
+    } catch {
+      /* ignore */
+    }
+  }
+  return true;
+}
+
+mergeStoredCategories();
+
 export type AssetCategoryKind =
   | "large_format"
   | "digital_printer"

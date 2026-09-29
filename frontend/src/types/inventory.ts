@@ -150,8 +150,51 @@ export function formatAssetSaleSpec(spec?: AssetSaleCategorySpec | null | undefi
       return `${spec.pages} pages`;
     case "fargo":
       const side = spec.sideMode === "double" ? "Double" : "Single";
-      return `${side} side${spec.laminated ? ", Laminated" : ""}`;
+      return `${side} side, ${spec.laminated ? "Laminated" : "No lamination"}`;
   }
+}
+
+export type AssetCategoryKindForIncome =
+  | "large_format"
+  | "digital_printer"
+  | "fargo"
+  | "default";
+
+export function mapKindToIncomeSource(kind: AssetCategoryKindForIncome): string {
+  switch (kind) {
+    case "fargo":
+      return "Badge Print (Fargo)";
+    case "large_format":
+      return "Large Format";
+    case "digital_printer":
+      return "Digital Print";
+    default:
+      return "Linked Sale";
+  }
+}
+
+export function buildSaleIncomeDescription(
+  kind: AssetCategoryKindForIncome,
+  lines: SaleItem[],
+  _customer?: string,
+): string {
+  const parts: string[] = [];
+  for (const li of lines) {
+    const name = li.itemName?.trim() || "Sale item";
+    const spec = formatAssetSaleSpec(li.assetCategorySpec);
+    const qty = Number(li.quantity ?? 0);
+    let part = name;
+    if (spec) {
+      part += ` — ${spec}`;
+    }
+    if (kind === "fargo" && qty > 0 && !li.assetCategorySpec) {
+      part += ` × ${qty}`;
+    } else if (kind === "fargo" && qty > 0) {
+      part += ` × ${qty}`;
+    }
+    parts.push(part);
+  }
+  return parts.join("; ");
 }
 
 export interface SaleItem {

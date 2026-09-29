@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Receipt, LayoutGrid, FileText, FileSpreadsheet, Sparkles, TrendingDown } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { ReportsPanel } from "@/components/expenses/ExpensePanels";
 import { ExpenseInsights, ExpenseHeatmap } from "@/components/expenses/ExpenseInsights";
 import { ReceiptScanner } from "@/components/expenses/ReceiptScanner";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
+import { getEmployees, type Employee } from "@/services/api";
 
 export const Route = createFileRoute("/app/expenses")({
   component: ExpensesPage,
@@ -19,8 +21,32 @@ export const Route = createFileRoute("/app/expenses")({
 
 function ExpensesPage() {
   const store = useExpensesStore();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    getEmployees()
+      .then((data) => { if (Array.isArray(data)) setEmployees(data); })
+      .catch(() => {});
+  }, []);
+
+  const authenticatedUserName = useMemo(() => {
+    const fullName = (user?.user_metadata?.full_name as string) || "";
+    const emailPrefix = (user?.email?.split("@")[0]) || "";
+    const authEmail = user?.email || "";
+    const authUser = employees.find((e) => {
+      const eEmail = (e.email || "").toLowerCase().trim();
+      const authEm = authEmail.toLowerCase().trim();
+      const eName = (e.name || "").toLowerCase().trim();
+      const fName = fullName.toLowerCase().trim();
+      if (authEm && eEmail && eEmail === authEm) return true;
+      if (fName && eName && (eName === fName || eName.includes(fName) || fName.includes(eName))) return true;
+      return false;
+    });
+    return authUser?.name || fullName || emailPrefix || "System Admin";
+  }, [employees, user]);
 
   const overview = useMemo(() => {
     const total = store.expenses.reduce((s, e) => s + (e.amount || 0), 0);
@@ -111,9 +137,9 @@ function ExpensesPage() {
             onEdit={openEdit}
             onDuplicate={store.duplicateExpense}
             onRemove={store.removeExpense}
-            onDecide={(id, d) => store.decideExpense(id, d, "Faith Njeri", d === "approved" ? "Approved via inbox" : "Rejected")}
+            onDecide={(id, d) => store.decideExpense(id, d, authenticatedUserName, d === "approved" ? `Approved by ${authenticatedUserName}` : "Rejected after review")}
             onSubmitForApproval={(id) => store.updateExpense(id, { status: "submitted" })}
-            onReimburse={(id) => store.reimburse(id, "Faith Njeri")}
+            onReimburse={(id) => store.reimburse(id, authenticatedUserName)}
           />
         </TabsContent>
 
@@ -126,6 +152,7 @@ function ExpensesPage() {
         open={open}
         onOpenChange={setOpen}
         initial={editing}
+        staffMembers={employees}
         onSubmit={(data) => editing ? store.updateExpense(editing.id, data) : store.addExpense(data)}
       />
     </div>

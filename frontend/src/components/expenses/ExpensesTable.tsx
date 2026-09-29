@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Search, Pencil, Copy, Trash2, CheckCircle2, XCircle, Send, Paperclip } from "lucide-react";
+import { Plus, MoreHorizontal, Search, Pencil, Copy, Trash2, CheckCircle2, XCircle, Send, Paperclip, ShieldAlert } from "lucide-react";
+import { useRole } from "@/hooks/useRole";
 import type { Expense, ExpenseStatus } from "./expenses-store";
 
 const STATUS_TONE: Record<ExpenseStatus, string> = {
@@ -30,19 +31,19 @@ interface Props {
 }
 
 export function ExpensesTable({ title, expenses, onAdd, onEdit, onDuplicate, onRemove, onDecide, onSubmitForApproval, onReimburse }: Props) {
+  const { isAdmin, isManager } = useRole();
+  const canDecide = isAdmin || isManager;
+
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [employee, setEmployee] = useState<string>("all");
-  const [department, setDepartment] = useState<string>("all");
 
   const employees = useMemo(() => Array.from(new Set(expenses.map((e) => e.employee))).sort(), [expenses]);
-  const departments = useMemo(() => Array.from(new Set(expenses.map((e) => e.department))).sort(), [expenses]);
 
   const rows = useMemo(() => {
     return expenses
       .filter((e) => status === "all" || e.status === status)
       .filter((e) => employee === "all" || e.employee === employee)
-      .filter((e) => department === "all" || e.department === department)
       .filter((e) => {
         if (!q) return true;
         const t = q.toLowerCase();
@@ -50,14 +51,11 @@ export function ExpensesTable({ title, expenses, onAdd, onEdit, onDuplicate, onR
           || (e.employee ?? "").toLowerCase().includes(t)
           || (e.description ?? "").toLowerCase().includes(t);
       });
-  }, [expenses, status, employee, department, q]);
+  }, [expenses, status, employee, q]);
 
   const total = rows.reduce((s, e) => s + e.amount, 0);
 
-  const clear = () => {
-    setQ(""); setStatus("all");
-    setEmployee("all"); setDepartment("all");
-  };
+  const clear = () => { setQ(""); setStatus("all"); setEmployee("all"); };
 
   return (
     <div className="space-y-3">
@@ -69,20 +67,13 @@ export function ExpensesTable({ title, expenses, onAdd, onEdit, onDuplicate, onR
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white p-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search reference, employee, description…" className="w-64 bg-white pl-8" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search reference, staff, description…" className="w-64 bg-white pl-8" />
         </div>
         <Select value={employee} onValueChange={setEmployee}>
-          <SelectTrigger className="w-44 bg-white"><SelectValue placeholder="Employee" /></SelectTrigger>
+          <SelectTrigger className="w-44 bg-white"><SelectValue placeholder="Staff" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All employees</SelectItem>
+            <SelectItem value="all">All staff</SelectItem>
             {employees.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={department} onValueChange={setDepartment}>
-          <SelectTrigger className="w-40 bg-white"><SelectValue placeholder="Department" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All departments</SelectItem>
-            {departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={setStatus}>
@@ -106,36 +97,27 @@ export function ExpensesTable({ title, expenses, onAdd, onEdit, onDuplicate, onR
             <TableRow className="bg-muted/40">
               <TableHead>Reference</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Employee</TableHead>
-              <TableHead>Department</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Staff</TableHead>
               <TableHead className="text-right">Amount</TableHead>
-              <TableHead>Payment</TableHead>
-              <TableHead>Reimb.</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <TableRow><TableCell colSpan={10} className="py-12 text-center text-sm text-muted-foreground">No expenses match these filters.</TableCell></TableRow>
-            ) : rows.map((e) => {
+              <TableRow><TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">No expenses match these filters.</TableCell></TableRow>
+            ) : rows.map((e, i) => {
               return (
-                <TableRow key={e.id} className="text-sm">
-                  <TableCell className="font-mono text-xs">{e.reference}{e.attachment && <Paperclip className="ml-1 inline h-3 w-3 text-muted-foreground" />}</TableCell>
+                <TableRow
+                  key={e.id}
+                  className="text-sm transition-all hover:bg-muted/40"
+                >
+                  <TableCell className="font-mono text-xs">{e.reference}</TableCell>
                   <TableCell className="font-mono text-xs">{e.date}</TableCell>
-                  <TableCell className="capitalize text-muted-foreground">{e.type}</TableCell>
+                  <TableCell className="capitalize text-muted-foreground">{e.type.replace(/_/g, " ")}</TableCell>
                   <TableCell className="font-medium">{e.employee}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.department}</TableCell>
                   <TableCell className="text-right font-mono">{e.currency} {e.amount.toLocaleString()}</TableCell>
-                  <TableCell className="capitalize text-muted-foreground">{e.paymentMethod.replace("_", " ")}</TableCell>
-                  <TableCell>
-                    {e.reimbursable
-                      ? (e.reimbursed
-                          ? <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">Done</Badge>
-                          : <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">Pending</Badge>)
-                      : <span className="text-xs text-muted-foreground">—</span>}
-                  </TableCell>
                   <TableCell><Badge variant="outline" className={STATUS_TONE[e.status]}>{e.status}</Badge></TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -144,11 +126,17 @@ export function ExpensesTable({ title, expenses, onAdd, onEdit, onDuplicate, onR
                         <DropdownMenuItem onClick={() => onEdit(e)}><Pencil className="mr-2 h-3.5 w-3.5" /> Edit</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onDuplicate(e.id)}><Copy className="mr-2 h-3.5 w-3.5" /> Duplicate</DropdownMenuItem>
                         {e.status === "draft" && <DropdownMenuItem onClick={() => onSubmitForApproval(e.id)}><Send className="mr-2 h-3.5 w-3.5" /> Submit</DropdownMenuItem>}
-                        {e.status === "submitted" && <>
-                          <DropdownMenuItem onClick={() => onDecide(e.id, "approved")}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onDecide(e.id, "rejected")}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</DropdownMenuItem>
-                        </>}
-                        {onReimburse && e.reimbursable && !e.reimbursed && e.status === "approved" && (
+                        {e.status === "submitted" && canDecide && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => onDecide(e.id, "approved")} className="text-emerald-600 focus:bg-emerald-50 focus:text-emerald-700"><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onDecide(e.id, "rejected")} className="text-rose-600 focus:bg-rose-50 focus:text-rose-700"><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</DropdownMenuItem>
+                          </>
+                        )}
+                        {e.status === "submitted" && !canDecide && (
+                          <DropdownMenuItem disabled className="text-xs text-muted-foreground opacity-70"><ShieldAlert className="mr-2 h-3.5 w-3.5" /> Approval restricted to Admin/Manager</DropdownMenuItem>
+                        )}
+                        {onReimburse && e.status === "approved" && canDecide && (
                           <DropdownMenuItem onClick={() => onReimburse(e.id)}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Mark reimbursed</DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />

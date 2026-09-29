@@ -324,6 +324,16 @@ def sales_order_from_row(row, items=None):
         except (json.JSONDecodeError, TypeError):
             acc_details = None
 
+    ppda_compliance = None
+    raw_ppda = get("ppda_compliance")
+    if raw_ppda:
+        try:
+            parsed = json.loads(raw_ppda)
+            if isinstance(parsed, dict):
+                ppda_compliance = parsed
+        except (json.JSONDecodeError, TypeError):
+            ppda_compliance = None
+
     return {
         "id": row["id"],
         "lpoNumber": get("lpo_number", ""),
@@ -342,6 +352,7 @@ def sales_order_from_row(row, items=None):
         "notes": get("notes"),
         "requiredDocumentTypes": req_docs,
         "accountDetails": acc_details,
+        "ppdaCompliance": ppda_compliance,
         "isLpoAccount": bool(get("is_lpo_account", 0)),
         "items": [sales_order_item_from_row(it) for it in (items or [])],
         "createdAt": get("created_at", ""),

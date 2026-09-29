@@ -141,7 +141,6 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
 
   useEffect(() => {
     resetCategoryInputs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetId]);
   const activeStaff = useMemo(() => {
     const list = employees.filter((e) => {

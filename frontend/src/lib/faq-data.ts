@@ -16,7 +16,7 @@ export const FAQ_DATA: FaqCategory[] = [
       { question: "How do I get started?", answer: "Sign in with your staff account. Your workspace opens with starter data across each module so you can begin exploring immediately." },
       { question: "What currency does the app use?", answer: "All amounts across the app are expressed in Uganda Shillings (UGX). Multi-currency bank accounts can still be opened, but reporting rolls up to UGX." },
       { question: "How do I navigate quickly?", answer: "Use the sidebar (desktop) or bottom navigation (mobile). Press CMD/CTRL + K anywhere to open the command palette and jump to any page, item or action." },
-      { question: "Which roles are available?", answer: "Admin (full access), Manager (operations + finance), and Staff (transactions, orders, chat, assets, reports and help). Sensitive modules like Bank, Employees and Settings are restricted." },
+      { question: "Which roles are available?", answer: "Admin (full access), Manager (operations + finance), and Staff (transactions, bids, chat, assets, reports and help). Sensitive modules like Bank, Employees and Settings are restricted." },
     ],
   },
   {
@@ -29,12 +29,12 @@ export const FAQ_DATA: FaqCategory[] = [
     ],
   },
   {
-    title: "Sales, transactions & orders",
+    title: "Sales, transactions & bids",
     items: [
       { question: "How is VAT handled on a sale?", answer: "VAT is optional and defaults to 18% when enabled. Toggle it on the Add Sale sheet — the line totals update automatically." },
       { question: "Walk-in customers?", answer: "If you leave the customer name blank on a transaction, the sale is recorded against 'Walk-in' automatically." },
-      { question: "Can I link a sale to a company asset?", answer: "Yes. On the sale sheet, pick the asset that fulfilled the order (e.g. delivery vehicle). It appears on the transaction record and asset history." },
-      { question: "How do quotations work?", answer: "On the Orders page you can attach a detailed quotation as text plus an image or PDF file. Customers receive the same document you store." },
+      { question: "Can I link a sale to a company asset?", answer: "Yes. On the sale sheet, pick the asset that fulfilled the tender (e.g. delivery vehicle). It appears on the transaction record and asset history." },
+      { question: "How do quotations work?", answer: "On the Bids page you can attach a detailed tender quotation as text plus an image or PDF file. Procuring entities receive the same document set you store." },
     ],
   },
   {

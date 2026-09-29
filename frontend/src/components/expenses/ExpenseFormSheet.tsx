@@ -5,38 +5,85 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { DEPARTMENT_OPTIONS, type Expense, type ExpensePaymentMethod, type ExpenseStatus, type ExpenseType, type RecurringFreq } from "./expenses-store";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Plus } from "lucide-react";
+import { motion } from "framer-motion";
+import { getEmployees, type Employee as StaffMember } from "@/services/api";
+import { type Expense, type ExpenseStatus, type ExpenseType, type RecurringFreq } from "./expenses-store";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial?: Expense | null;
   onSubmit: (data: Omit<Expense, "id" | "reference" | "createdAt">) => void | Promise<Expense | void>;
+  staffMembers?: StaffMember[];
 }
+
+const DEFAULT_CATEGORIES = [
+  { value: "employee", label: "Staff Expense" },
+  { value: "travel", label: "Travel" },
+  { value: "recurring", label: "Recurring" },
+  { value: "operations", label: "Operations" },
+  { value: "utilities", label: "Utilities" },
+  { value: "office_supplies", label: "Office Supplies" },
+  { value: "maintenance", label: "Maintenance" },
+  { value: "marketing", label: "Marketing" },
+  { value: "consulting", label: "Consulting & Services" },
+  { value: "software", label: "IT & Software" },
+];
 
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
-export function ExpenseFormSheet({ open, onOpenChange, initial, onSubmit }: Props) {
+export function ExpenseFormSheet({ open, onOpenChange, initial, onSubmit, staffMembers: propStaff }: Props) {
   const [form, setForm] = useState(() => mkInitial(initial));
+  const [staffList, setStaffList] = useState<StaffMember[]>(propStaff || []);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [addCatOpen, setAddCatOpen] = useState(false);
+  const [customCatInput, setCustomCatInput] = useState("");
 
-  useEffect(() => { setForm(mkInitial(initial)); }, [initial, open]);
+  useEffect(() => {
+    setForm(mkInitial(initial));
+  }, [initial, open]);
+
+  useEffect(() => {
+    if (propStaff && propStaff.length > 0) {
+      setStaffList(propStaff);
+    } else {
+      getEmployees()
+        .then((data) => {
+          if (Array.isArray(data)) setStaffList(data);
+        })
+        .catch(() => {});
+    }
+  }, [propStaff, open]);
 
   const update = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleAddCategory = () => {
+    const trimmed = customCatInput.trim();
+    if (!trimmed) return;
+    const catValue = trimmed.toLowerCase().replace(/\s+/g, "_");
+    if (!categories.some((c) => c.value === catValue)) {
+      setCategories((prev) => [...prev, { value: catValue, label: trimmed }]);
+    }
+    update("type", catValue as ExpenseType);
+    setCustomCatInput("");
+    setAddCatOpen(false);
+  };
 
   const submit = (status: ExpenseStatus) => {
     onSubmit({
       date: form.date,
       type: form.type,
-      employee: form.employee.trim() || "Unassigned",
-      department: form.department,
+      employee: form.employee.trim() || "Unassigned Staff",
+      department: "",
       amount: Number(form.amount) || 0,
-      currency: form.currency,
-      paymentMethod: form.paymentMethod,
+      currency: "UGX",
+      paymentMethod: "cash",
       description: form.description.trim(),
-      attachment: form.attachment.trim() || null,
+      attachment: null,
       status,
-      reimbursable: form.reimbursable,
+      reimbursable: false,
       reimbursed: false,
       approvedBy: null,
       rejectedReason: null,
@@ -47,94 +94,135 @@ export function ExpenseFormSheet({ open, onOpenChange, initial, onSubmit }: Prop
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>{initial ? "Edit expense" : "New expense"}</SheetTitle>
-        </SheetHeader>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>{initial ? "Edit expense" : "New expense"}</SheetTitle>
+          </SheetHeader>
 
-        <div className="mt-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Date"><Input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} /></Field>
-            <Field label="Type">
-              <Select value={form.type} onValueChange={(v) => update("type", v as ExpenseType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="employee">Employee</SelectItem>
-                  <SelectItem value="travel">Travel</SelectItem>
-                  <SelectItem value="recurring">Recurring</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Employee"><Input value={form.employee} onChange={(e) => update("employee", e.target.value)} placeholder="Full name" /></Field>
-            <Field label="Department">
-              <Select value={form.department} onValueChange={(v) => update("department", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{DEPARTMENT_OPTIONS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-              </Select>
-            </Field>
-            <Field label="Amount"><Input type="number" value={form.amount} onChange={(e) => update("amount", e.target.value)} /></Field>
-            <Field label="Currency">
-              <Select value={form.currency} onValueChange={(v) => update("currency", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{["UGX", "USD", "EUR", "GBP", "TZS"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-              </Select>
-            </Field>
-            <Field label="Payment method">
-              <Select value={form.paymentMethod} onValueChange={(v) => update("paymentMethod", v as ExpensePaymentMethod)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="card">Personal card</SelectItem>
-                  <SelectItem value="company_card">Company card</SelectItem>
-                  <SelectItem value="bank_transfer">Bank transfer</SelectItem>
-                  <SelectItem value="mobile">Mobile money</SelectItem>
-                  <SelectItem value="petty_cash">Petty cash</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Attachment"><Input value={form.attachment} onChange={(e) => update("attachment", e.target.value)} placeholder="receipt.pdf" /></Field>
-          </div>
+          <div className="mt-5 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Date">
+                <Input type="date" value={form.date} onChange={(e) => update("date", e.target.value)} />
+              </Field>
 
-          <Field label="Description"><Textarea rows={3} value={form.description} onChange={(e) => update("description", e.target.value)} /></Field>
+              <Field label="Category">
+                <div className="flex items-center gap-1.5">
+                  <Select value={form.type} onValueChange={(v) => update("type", v as ExpenseType)}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 shrink-0"
+                    onClick={() => setAddCatOpen(true)}
+                    title="Add custom category"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Field>
 
-          {form.type === "travel" && (
-            <div className="grid grid-cols-3 gap-3 rounded-lg border border-border bg-muted/30 p-3">
-              <Field label="Destination"><Input value={form.destination} onChange={(e) => update("destination", e.target.value)} /></Field>
-              <Field label="Purpose"><Input value={form.purpose} onChange={(e) => update("purpose", e.target.value)} /></Field>
-              <Field label="Mileage (km)"><Input type="number" value={form.mileage} onChange={(e) => update("mileage", e.target.value)} /></Field>
-            </div>
-          )}
-
-          {form.type === "recurring" && (
-            <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted/30 p-3">
-              <Field label="Frequency">
-                <Select value={form.recurringFreq} onValueChange={(v) => update("recurringFreq", v as RecurringFreq)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+              <Field label="Staff">
+                <Select value={form.employee} onValueChange={(v) => update("employee", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select branch staff" />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                    <SelectItem value="yearly">Yearly</SelectItem>
+                    {staffList.length === 0 ? (
+                      <SelectItem value={form.employee || "Unassigned"}>
+                        {form.employee || "Unassigned"}
+                      </SelectItem>
+                    ) : (
+                      staffList.map((s) => (
+                        <SelectItem key={s.id || s.name} value={s.name}>
+                          {s.name} {s.role ? `(${s.role})` : ""}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Next run"><Input type="date" value={form.nextRun} onChange={(e) => update("nextRun", e.target.value)} /></Field>
+
+              <Field label="Amount">
+                <Input type="number" value={form.amount} onChange={(e) => update("amount", e.target.value)} placeholder="0" />
+              </Field>
             </div>
-          )}
 
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
-            <Label className="text-sm">Reimbursable to employee</Label>
-            <Switch checked={form.reimbursable} onCheckedChange={(v) => update("reimbursable", v)} />
+            <Field label="Description">
+              <Textarea rows={3} value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="Enter details regarding this expense..." />
+            </Field>
+
+            {form.type === "travel" && (
+              <div className="grid grid-cols-3 gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                <Field label="Destination"><Input value={form.destination} onChange={(e) => update("destination", e.target.value)} /></Field>
+                <Field label="Purpose"><Input value={form.purpose} onChange={(e) => update("purpose", e.target.value)} /></Field>
+                <Field label="Mileage (km)"><Input type="number" value={form.mileage} onChange={(e) => update("mileage", e.target.value)} /></Field>
+              </div>
+            )}
+
+            {form.type === "recurring" && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted/30 p-3"
+              >
+                <Field label="Frequency">
+                  <Select value={form.recurringFreq} onValueChange={(v) => update("recurringFreq", v as RecurringFreq)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Next run"><Input type="date" value={form.nextRun} onChange={(e) => update("nextRun", e.target.value)} /></Field>
+              </motion.div>
+            )}
           </div>
-        </div>
 
-        <div className="mt-6 flex gap-1.5">
-          <Button variant="outline" className="flex-1" onClick={() => submit("draft")}>Save draft</Button>
-          <Button className="flex-1" onClick={() => submit("submitted")}>Submit for approval</Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+          <div className="mt-6 flex gap-1.5">
+            <Button variant="outline" className="flex-1" onClick={() => submit("draft")}>Save draft</Button>
+            <Button className="flex-1" onClick={() => submit("submitted")}>Submit for approval</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={addCatOpen} onOpenChange={setAddCatOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Add Expense Category</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Category Name</Label>
+            <Input
+              value={customCatInput}
+              onChange={(e) => setCustomCatInput(e.target.value)}
+              placeholder="e.g. Legal Fees, Equipment, Fleet Fuel..."
+              onKeyDown={(e) => { if (e.key === "Enter") handleAddCategory(); }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddCatOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddCategory} disabled={!customCatInput.trim()}>Add Category</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -152,13 +240,11 @@ function mkInitial(initial?: Expense | null) {
     date: initial?.date ?? TODAY(),
     type: (initial?.type ?? "employee") as ExpenseType,
     employee: initial?.employee ?? "",
-    department: initial?.department ?? DEPARTMENT_OPTIONS[0],
+    department: "",
     amount: initial ? String(initial.amount) : "",
-    currency: initial?.currency ?? "UGX",
-    paymentMethod: (initial?.paymentMethod ?? "card") as ExpensePaymentMethod,
+    currency: "UGX",
+    paymentMethod: "cash",
     description: initial?.description ?? "",
-    attachment: initial?.attachment ?? "",
-    reimbursable: initial?.reimbursable ?? false,
     destination: initial?.travel?.destination ?? "",
     purpose: initial?.travel?.purpose ?? "",
     mileage: initial ? String(initial.travel?.mileage ?? 0) : "0",
@@ -166,3 +252,4 @@ function mkInitial(initial?: Expense | null) {
     nextRun: initial?.recurring?.nextRun ?? TODAY(),
   };
 }
+

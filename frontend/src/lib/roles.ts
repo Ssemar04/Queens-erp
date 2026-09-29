@@ -12,7 +12,7 @@ export const ALL_SYSTEM_MODULES: SystemModule[] = [
   // Operations
   { id: "dashboard", name: "Dashboard", path: "/app/dashboard", group: "Operations", description: "Executive overview & KPI metrics" },
   { id: "catalog", name: "Inventory", path: "/app/catalog", group: "Operations", description: "Stock catalog & items management" },
-  { id: "orders", name: "Orders", path: "/app/orders", group: "Operations", description: "Sales orders & requisition tracking" },
+  { id: "orders", name: "Bids", path: "/app/orders", group: "Operations", description: "Bids, tenders & PPDA public procurement tracking" },
   { id: "customers", name: "Customers", path: "/app/customers", group: "Operations", description: "Customer directory & debt histories" },
   { id: "movements", name: "Transactions", path: "/app/movements", group: "Operations", description: "POS sales & stock transaction logs" },
   { id: "locations", name: "Branches", path: "/app/locations", group: "Operations", description: "Multi-branch store location management" },
@@ -58,7 +58,7 @@ export const ACCESS_ROLE_PRESETS: AccessRolePreset[] = [
     badgeColor: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
     description: "Operational management across sales, inventory, finance, suppliers, and reports.",
     allowedModules: [
-      "Dashboard", "Inventory", "Orders", "Customers", "Transactions", "Branches",
+      "Dashboard", "Inventory", "Bids", "Customers", "Transactions", "Branches",
       "Bank", "Debtors", "Creditors", "Expenses", "Chatroom", "Assets", "Reports", "Supplies", "Help"
     ],
   },
@@ -67,14 +67,14 @@ export const ACCESS_ROLE_PRESETS: AccessRolePreset[] = [
     label: "Sales / Cashier",
     badgeColor: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
     description: "Front-desk sales, customer transactions, order processing, and customer lookup.",
-    allowedModules: ["Transactions", "Orders", "Customers", "Chatroom", "Help"],
+    allowedModules: ["Transactions", "Bids", "Customers", "Chatroom", "Help"],
   },
   {
     id: "inventory",
     label: "Inventory Clerk",
     badgeColor: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
     description: "Stock catalog, item movements, purchase orders, asset tracking, and supplies.",
-    allowedModules: ["Inventory", "Orders", "Transactions", "Supplies", "Assets", "Chatroom", "Help"],
+    allowedModules: ["Inventory", "Bids", "Transactions", "Supplies", "Assets", "Chatroom", "Help"],
   },
   {
     id: "accountant",
@@ -117,7 +117,7 @@ export const SYSTEM_ROLES: Record<UserRoleType, RoleInfo> = {
     badgeVariant: "secondary",
     description: "Operational management of inventory, sales, customers, transactions, finance, procurement, and reports.",
     accessibleModules: [
-      "Dashboard", "Inventory", "Orders", "Customers", "Transactions", "Branches",
+      "Dashboard", "Inventory", "Bids", "Customers", "Transactions", "Branches",
       "Bank", "Debtors", "Creditors", "Expenses", "Chatroom", "Assets", "Reports", "Supplies", "Help"
     ],
   },
@@ -128,7 +128,7 @@ export const SYSTEM_ROLES: Record<UserRoleType, RoleInfo> = {
     badgeVariant: "outline",
     description: "Standard staff access for creating transactions, submitting orders, team chat, asset viewing, reports, and help.",
     accessibleModules: [
-      "Transactions", "Orders", "Chatroom", "Assets", "Reports", "Help"
+      "Transactions", "Bids", "Chatroom", "Assets", "Reports", "Help"
     ],
   },
 };

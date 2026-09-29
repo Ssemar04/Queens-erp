@@ -16,6 +16,7 @@ import { Route as AppAiInsightsRouteImport } from './routes/app.ai-insights'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
 import { Route as AppAssetsRouteImport } from './routes/app.assets'
 import { Route as AppBankRouteImport } from './routes/app.bank'
+import { Route as AppBidsRouteImport } from './routes/app.bids'
 import { Route as AppCatalogRouteImport } from './routes/app.catalog'
 import { Route as AppChatRouteImport } from './routes/app.chat'
 import { Route as AppCreditorsRouteImport } from './routes/app.creditors'
@@ -66,6 +67,11 @@ const AppAssetsRoute = AppAssetsRouteImport.update({
 const AppBankRoute = AppBankRouteImport.update({
   id: '/bank',
   path: '/bank',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBidsRoute = AppBidsRouteImport.update({
+  id: '/bids',
+  path: '/bids',
   getParentRoute: () => AppRoute,
 } as any)
 const AppCatalogRoute = AppCatalogRouteImport.update({
@@ -156,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/app/analytics': typeof AppAnalyticsRoute
   '/app/assets': typeof AppAssetsRoute
   '/app/bank': typeof AppBankRoute
+  '/app/bids': typeof AppBidsRoute
   '/app/catalog': typeof AppCatalogRoute
   '/app/chat': typeof AppChatRoute
   '/app/creditors': typeof AppCreditorsRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
   '/app/analytics': typeof AppAnalyticsRoute
   '/app/assets': typeof AppAssetsRoute
   '/app/bank': typeof AppBankRoute
+  '/app/bids': typeof AppBidsRoute
   '/app/catalog': typeof AppCatalogRoute
   '/app/chat': typeof AppChatRoute
   '/app/creditors': typeof AppCreditorsRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/app/analytics': typeof AppAnalyticsRoute
   '/app/assets': typeof AppAssetsRoute
   '/app/bank': typeof AppBankRoute
+  '/app/bids': typeof AppBidsRoute
   '/app/catalog': typeof AppCatalogRoute
   '/app/chat': typeof AppChatRoute
   '/app/creditors': typeof AppCreditorsRoute
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
     | '/app/analytics'
     | '/app/assets'
     | '/app/bank'
+    | '/app/bids'
     | '/app/catalog'
     | '/app/chat'
     | '/app/creditors'
@@ -257,6 +267,7 @@ export interface FileRouteTypes {
     | '/app/analytics'
     | '/app/assets'
     | '/app/bank'
+    | '/app/bids'
     | '/app/catalog'
     | '/app/chat'
     | '/app/creditors'
@@ -282,6 +293,7 @@ export interface FileRouteTypes {
     | '/app/analytics'
     | '/app/assets'
     | '/app/bank'
+    | '/app/bids'
     | '/app/catalog'
     | '/app/chat'
     | '/app/creditors'
@@ -355,6 +367,13 @@ declare module '@tanstack/react-router' {
       path: '/bank'
       fullPath: '/app/bank'
       preLoaderRoute: typeof AppBankRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/bids': {
+      id: '/app/bids'
+      path: '/bids'
+      fullPath: '/app/bids'
+      preLoaderRoute: typeof AppBidsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/catalog': {
@@ -477,6 +496,7 @@ interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppAssetsRoute: typeof AppAssetsRoute
   AppBankRoute: typeof AppBankRoute
+  AppBidsRoute: typeof AppBidsRoute
   AppCatalogRoute: typeof AppCatalogRoute
   AppChatRoute: typeof AppChatRoute
   AppCreditorsRoute: typeof AppCreditorsRoute
@@ -501,6 +521,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsRoute: AppAnalyticsRoute,
   AppAssetsRoute: AppAssetsRoute,
   AppBankRoute: AppBankRoute,
+  AppBidsRoute: AppBidsRoute,
   AppCatalogRoute: AppCatalogRoute,
   AppChatRoute: AppChatRoute,
   AppCreditorsRoute: AppCreditorsRoute,

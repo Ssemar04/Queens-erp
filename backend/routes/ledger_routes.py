@@ -137,3 +137,23 @@ def create_ledger_payment(kind, entry_id):
             "success": False,
             "message": f"Failed to record payment: {exc}"
         }), 500
+
+
+@ledger_bp.route("/api/debtors")
+def list_debtors():
+    return list_ledger_entries("debtor")
+
+
+@ledger_bp.route("/api/debtors", methods=["POST"])
+def create_debtor():
+    return create_ledger_entry("debtor")
+
+
+@ledger_bp.route("/api/debtors/<entry_id>", methods=["DELETE"])
+def delete_debtor(entry_id):
+    return delete_ledger_entry("debtor", entry_id)
+
+
+@ledger_bp.route("/api/debtors/<entry_id>/payments", methods=["POST"])
+def create_debtor_payment(entry_id):
+    return create_ledger_payment("debtor", entry_id)

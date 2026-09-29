@@ -549,7 +549,7 @@ export function UserAccountModal({ open, onOpenChange }: UserAccountModalProps) 
                     <SelectContent>
                       <SelectItem value="/app/dashboard">Dashboard Overview</SelectItem>
                       <SelectItem value="/app/catalog">Inventory Catalog</SelectItem>
-                      <SelectItem value="/app/orders">Sales Orders</SelectItem>
+                      <SelectItem value="/app/orders">Bids</SelectItem>
                       <SelectItem value="/app/reports">Reports & Analytics</SelectItem>
                     </SelectContent>
                   </Select>

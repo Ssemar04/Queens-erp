@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Boxes,
   FileBarChart2,
+  Gavel,
 } from "lucide-react";
 
 import { Link, useLocation } from "@tanstack/react-router";
@@ -42,7 +43,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
       { label: "Inventory", href: "/app/catalog", icon: Package },
-      { label: "Orders", href: "/app/orders", icon: ShoppingBag },
+      { label: "Bids", href: "/app/orders", icon: Gavel },
       { label: "Customers", href: "/app/customers", icon: Users },
       { label: "Transactions", href: "/app/movements", icon: ArrowLeftRight },
       { label: "Branches", href: "/app/locations", icon: MapPin },

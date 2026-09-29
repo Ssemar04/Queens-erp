@@ -8,7 +8,7 @@ from models.serializers import (
     expense_category_from_row,
     expense_from_row,
 )
-from routes.guards import require_current_user
+from routes.guards import require_current_user, require_manager_user
 from services import expenses_service
 
 
@@ -143,7 +143,7 @@ def delete_expense(expense_id):
 
 @expenses_bp.route("/api/expenses/<expense_id>/decision", methods=["POST"])
 def decide_expense(expense_id):
-    _, auth_error = require_current_user()
+    user, auth_error = require_manager_user()
     if auth_error:
         return auth_error
 
@@ -155,12 +155,15 @@ def decide_expense(expense_id):
     if data.get("decision") not in {"approved", "rejected"}:
         return jsonify({"success": False, "message": "Invalid expense decision"}), 400
 
+    if not data.get("actor"):
+        data["actor"] = user.get("name") or user.get("email") or "Unknown"
+
     return jsonify(expense_from_row(expenses_service.decide(expense_id, data)))
 
 
 @expenses_bp.route("/api/expenses/<expense_id>/reimburse", methods=["POST"])
 def reimburse_expense(expense_id):
-    _, auth_error = require_current_user()
+    user, auth_error = require_manager_user()
     if auth_error:
         return auth_error
 
@@ -169,6 +172,10 @@ def reimburse_expense(expense_id):
 
     data = request.get_json(silent=True) or {}
     data.setdefault("auditId", str(uuid.uuid4()))
+
+    if not data.get("actor"):
+        data["actor"] = user.get("name") or user.get("email") or "Unknown"
+
     return jsonify(expense_from_row(expenses_service.reimburse(expense_id, data)))
 
 

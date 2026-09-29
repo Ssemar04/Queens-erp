@@ -30,10 +30,8 @@ export function ExpensesDashboard({ expenses }: Props) {
     const monthExp = expenses.filter((e) => monthKey(new Date(e.date)) === thisMonth);
     const total = monthExp.reduce((s, e) => s + e.amount, 0);
     const pending = expenses.filter((e) => e.status === "submitted").reduce((s, e) => s + e.amount, 0);
-    const approved = expenses.filter((e) => e.status === "approved" || e.status === "paid").reduce((s, e) => s + e.amount, 0);
+    const approved = expenses.filter((e) => e.status === "approved" || e.status === "paid" || e.status === "reimbursed").reduce((s, e) => s + e.amount, 0);
     const rejected = expenses.filter((e) => e.status === "rejected").reduce((s, e) => s + e.amount, 0);
-    const reimbursable = expenses.filter((e) => e.reimbursable && !e.reimbursed).reduce((s, e) => s + e.amount, 0);
-    const outstandingReimb = expenses.filter((e) => e.reimbursable && !e.reimbursed && e.status !== "rejected").length;
 
     const trend: { month: string; total: number }[] = [];
     for (let i = 5; i >= 0; i--) {
@@ -42,10 +40,6 @@ export function ExpensesDashboard({ expenses }: Props) {
       const total = expenses.filter((e) => monthKey(new Date(e.date)) === key).reduce((s, e) => s + e.amount, 0);
       trend.push({ month: d.toLocaleString("en", { month: "short" }), total });
     }
-
-    const byDept = Object.entries(expenses.reduce<Record<string, number>>((acc, e) => {
-      acc[e.department] = (acc[e.department] ?? 0) + e.amount; return acc;
-    }, {})).map(([department, total]) => ({ department, total }));
 
     const byType = (["employee", "travel", "recurring"] as const).map((t) => ({
       name: TYPE_LABEL[t] ?? t,
@@ -57,26 +51,21 @@ export function ExpensesDashboard({ expenses }: Props) {
       acc[e.employee] = (acc[e.employee] ?? 0) + e.amount; return acc;
     }, {})).map(([employee, total]) => ({ employee, total })).sort((a, b) => b.total - a.total).slice(0, 5);
 
-    const byPayment = Object.entries(expenses.reduce<Record<string, number>>((acc, e) => {
-      acc[e.paymentMethod] = (acc[e.paymentMethod] ?? 0) + e.amount; return acc;
-    }, {})).map(([method, total]) => ({
-      method: method.replace("_", " "),
-      budget: Math.max(total, 1),
-      actual: total,
-    }));
+    const byStatus = (["submitted", "approved", "rejected", "reimbursed", "paid"] as const).map((s) => ({
+      status: s.charAt(0).toUpperCase() + s.slice(1),
+      amount: expenses.filter((e) => e.status === s).reduce((sum, e) => sum + e.amount, 0),
+    })).filter((r) => r.amount > 0);
 
-    return { total, pending, approved, rejected, reimbursable, outstandingReimb, trend, byDept, byType, top, byPayment };
+    return { total, pending, approved, rejected, trend, byType, top, byStatus };
   }, [expenses]);
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Total · this month" value={fmt(stats.total)} accent="from-primary to-primary/70" />
         <Kpi label="Pending approvals" value={fmt(stats.pending)} accent="from-amber-500 to-amber-400" />
         <Kpi label="Approved" value={fmt(stats.approved)} accent="from-emerald-600 to-emerald-500" />
         <Kpi label="Rejected" value={fmt(stats.rejected)} accent="from-destructive to-destructive/70" />
-        <Kpi label="Reimbursable" value={fmt(stats.reimbursable)} accent="from-indigo-600 to-indigo-500" />
-        <Kpi label="Outstanding reimb." value={String(stats.outstandingReimb)} accent="from-rose-500 to-rose-400" suffix="items" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -118,14 +107,14 @@ export function ExpensesDashboard({ expenses }: Props) {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="rounded-xl bg-white">
-          <CardHeader><CardTitle className="text-base">By department</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Status breakdown</CardTitle></CardHeader>
           <CardContent style={{ height: 240 }}>
             <ResponsiveContainer>
-              <BarChart data={stats.byDept}>
-                <XAxis dataKey="department" tickLine={false} axisLine={false} className="text-xs" />
+              <BarChart data={stats.byStatus}>
+                <XAxis dataKey="status" tickLine={false} axisLine={false} className="text-xs" />
                 <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tickLine={false} axisLine={false} className="text-xs" />
                 <Tooltip formatter={(v: number) => fmt(v)} />
-                <Bar dataKey="total" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -136,7 +125,7 @@ export function ExpensesDashboard({ expenses }: Props) {
           <CardContent className="space-y-2">
             {stats.top.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">No data yet.</p>}
             {stats.top.map((t) => (
-              <div key={t.employee} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
+              <div key={t.employee} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 transition-all hover:border-[#003399]/30 hover:bg-[#003399]/[0.03]">
                 <span className="text-sm font-medium">{t.employee}</span>
                 <span className="font-mono text-xs text-muted-foreground">{fmt(t.total)}</span>
               </div>
@@ -145,16 +134,27 @@ export function ExpensesDashboard({ expenses }: Props) {
         </Card>
 
         <Card className="rounded-xl bg-white">
-          <CardHeader><CardTitle className="text-base">By payment method · MTD</CardTitle></CardHeader>
-          <CardContent style={{ height: 240 }}>
-            <ResponsiveContainer>
-              <BarChart data={stats.byPayment}>
-                <XAxis dataKey="method" tickLine={false} axisLine={false} className="text-xs" />
-                <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tickLine={false} axisLine={false} className="text-xs" />
-                <Tooltip formatter={(v: number) => fmt(v)} />
-                <Bar dataKey="actual" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <CardHeader><CardTitle className="text-base">Expense volume</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {stats.byStatus.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">No activity yet.</p>}
+            {stats.byStatus.map((s, i) => {
+              const max = Math.max(1, ...stats.byStatus.map((x) => x.amount));
+              const pct = (s.amount / max) * 100;
+              return (
+                <div key={s.status} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-muted-foreground">{s.status}</span>
+                    <span className="font-mono">{fmt(s.amount)}</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#003399] to-[#004CCC] transition-all"
+                      style={{ width: `${pct}%`, animationDelay: `${i * 0.05}s` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>

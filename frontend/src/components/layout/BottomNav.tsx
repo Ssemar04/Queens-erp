@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { LayoutDashboard, Package, ShoppingBag, ArrowLeftRight, MoreHorizontal } from "lucide-react";
+import { LayoutDashboard, Package, ArrowLeftRight, MoreHorizontal, Gavel } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -11,7 +11,7 @@ import { canAccessRoute } from "@/lib/route-guard";
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
   { label: "Inventory", href: "/app/catalog", icon: Package },
-  { label: "Orders", href: "/app/orders", icon: ShoppingBag },
+  { label: "Bids", href: "/app/orders", icon: Gavel },
   { label: "Transactions", href: "/app/movements", icon: ArrowLeftRight },
 ] as const;
 

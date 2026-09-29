@@ -79,11 +79,33 @@ def get_asset(asset_id):
     return _asset_record(row)
 
 
+def safe_float(val, default=0.0):
+    try:
+        if val is None or val == "":
+            return default
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_int(val, default=0):
+    try:
+        if val is None or val == "":
+            return default
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
 def create_asset(asset_data):
     db = get_db()
     asset_id = asset_data.get("id") or str(uuid.uuid4())
     now = current_timestamp()
     tag = asset_data.get("tag") or next_tag()
+
+    name = (asset_data.get("name") or "").strip()
+    category = (asset_data.get("category") or "General").strip()
+    purchase_date = asset_data.get("purchaseDate") or now[:10]
 
     db.execute(
         """
@@ -93,33 +115,33 @@ def create_asset(asset_data):
             status, condition, meter_unit, service_interval_meter, service_interval_days,
             last_service_date, last_service_meter, warranty_expiry, insurance_expiry,
             notes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             asset_id,
             tag,
-            asset_data["name"],
-            asset_data["category"],
-            asset_data.get("serialNumber", ""),
-            asset_data.get("manufacturer", ""),
-            asset_data.get("model", ""),
-            asset_data.get("location", ""),
-            asset_data.get("assignedTo", ""),
-            asset_data.get("staff", ""),
-            asset_data["purchaseDate"],
-            asset_data.get("purchaseCost", 0),
-            asset_data.get("salvageValue", 0),
-            asset_data.get("usefulLifeYears", 5),
-            asset_data.get("status", "active"),
-            asset_data.get("condition", "good"),
-            asset_data.get("meterUnit", "km"),
-            asset_data.get("serviceIntervalMeter", 0),
-            asset_data.get("serviceIntervalDays", 0),
-            asset_data.get("lastServiceDate"),
-            asset_data.get("lastServiceMeter"),
-            asset_data.get("warrantyExpiry"),
-            asset_data.get("insuranceExpiry"),
-            asset_data.get("notes"),
+            name,
+            category,
+            asset_data.get("serialNumber") or "",
+            asset_data.get("manufacturer") or "",
+            asset_data.get("model") or "",
+            asset_data.get("location") or "",
+            asset_data.get("assignedTo") or "",
+            asset_data.get("staff") or "",
+            purchase_date,
+            safe_float(asset_data.get("purchaseCost"), 0.0),
+            safe_float(asset_data.get("salvageValue"), 0.0),
+            safe_int(asset_data.get("usefulLifeYears"), 5),
+            asset_data.get("status") or "active",
+            asset_data.get("condition") or "good",
+            asset_data.get("meterUnit") or "km",
+            safe_int(asset_data.get("serviceIntervalMeter"), 0),
+            safe_int(asset_data.get("serviceIntervalDays"), 0),
+            asset_data.get("lastServiceDate") or None,
+            safe_int(asset_data.get("lastServiceMeter")) if asset_data.get("lastServiceMeter") is not None else None,
+            asset_data.get("warrantyExpiry") or None,
+            asset_data.get("insuranceExpiry") or None,
+            asset_data.get("notes") or "",
             asset_data.get("createdAt") or now,
             asset_data.get("updatedAt") or now,
         ),
@@ -197,9 +219,9 @@ def add_meter_reading(asset_id, reading_data):
         (
             reading_id,
             asset_id,
-            reading_data["date"],
-            reading_data["value"],
-            reading_data.get("recordedBy", ""),
+            reading_data.get("date") or now[:10],
+            safe_int(reading_data.get("value"), 0),
+            reading_data.get("recordedBy") or "",
             reading_data.get("note"),
         ),
     )
@@ -216,6 +238,8 @@ def add_service_record(asset_id, service_data):
     service_id = service_data.get("id") or str(uuid.uuid4())
     now = current_timestamp()
 
+    svc_date = service_data.get("date") or now[:10]
+
     db.execute(
         """
         INSERT INTO asset_service_records (
@@ -225,18 +249,18 @@ def add_service_record(asset_id, service_data):
         (
             service_id,
             asset_id,
-            service_data["date"],
-            service_data["type"],
-            service_data.get("performedBy", ""),
-            service_data.get("cost", 0),
-            service_data.get("notes", ""),
+            svc_date,
+            service_data.get("type") or "preventive",
+            service_data.get("performedBy") or "",
+            safe_float(service_data.get("cost"), 0.0),
+            service_data.get("notes") or "",
             service_data.get("nextDueDate"),
-            service_data.get("nextDueMeter"),
+            safe_int(service_data.get("nextDueMeter")) if service_data.get("nextDueMeter") is not None else None,
         ),
     )
 
     # Update asset's last_service_date, last_service_meter, and updated_at
-    if service_data.get("date"):
+    if svc_date:
         db.execute(
             """
             UPDATE assets
@@ -244,8 +268,8 @@ def add_service_record(asset_id, service_data):
             WHERE id = ?
             """,
             (
-                service_data["date"],
-                service_data.get("lastServiceMeter"),
+                svc_date,
+                safe_int(service_data.get("lastServiceMeter")) if service_data.get("lastServiceMeter") is not None else None,
                 now,
                 asset_id,
             ),

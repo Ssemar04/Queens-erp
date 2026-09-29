@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Boxes,
   FileBarChart2,
+  Gavel,
 } from "lucide-react";
 
 
@@ -30,7 +31,7 @@ export interface PageDef {
 export const PAGES: PageDef[] = [
   { label: "Dashboard", path: "/app/dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: "Inventory", path: "/app/catalog", icon: <Package className="h-4 w-4" /> },
-  { label: "Orders", path: "/app/orders", icon: <ShoppingBag className="h-4 w-4" /> },
+  { label: "Bids", path: "/app/orders", icon: <Gavel className="h-4 w-4" /> },
   { label: "Customers", path: "/app/customers", icon: <Users className="h-4 w-4" /> },
   { label: "Transactions", path: "/app/movements", icon: <ArrowRightLeft className="h-4 w-4" /> },
   { label: "Bank", path: "/app/bank", icon: <Landmark className="h-4 w-4" /> },

@@ -755,6 +755,7 @@ def init_branch_db_tables(db):
             notes TEXT,
             required_document_types TEXT,
             account_details TEXT,
+            ppda_compliance TEXT,
             is_lpo_account INTEGER DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -885,6 +886,12 @@ def init_branch_db_tables(db):
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (entry_id) REFERENCES ledger_entries (id) ON DELETE CASCADE
         );
+
+        CREATE VIEW IF NOT EXISTS debtors AS
+        SELECT * FROM ledger_entries WHERE kind = 'debtor';
+
+        CREATE VIEW IF NOT EXISTS creditors AS
+        SELECT * FROM ledger_entries WHERE kind = 'creditor';
 
         CREATE TABLE IF NOT EXISTS expense_categories (
             id TEXT PRIMARY KEY,
@@ -1137,6 +1144,7 @@ def init_branch_db_tables(db):
         ("complaints", "TEXT"),
         ("required_document_types", "TEXT"),
         ("account_details", "TEXT"),
+        ("ppda_compliance", "TEXT"),
         ("is_lpo_account", "INTEGER DEFAULT 0"),
     ])
     add_missing_columns(db, "bank_transactions", [("performed_by", "TEXT NOT NULL DEFAULT ''")])
@@ -1190,6 +1198,17 @@ def migrate_db():
     for branch in branches:
         branch_db = get_branch_db(branch["id"])
         init_branch_db_tables(branch_db)
+        try:
+            branch_db.execute("ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS ppda_compliance TEXT")
+            branch_db.commit()
+        except Exception:
+            try:
+                cols = [r[1] for r in branch_db.execute("PRAGMA table_info(sales_orders)").fetchall()]
+                if "ppda_compliance" not in cols:
+                    branch_db.execute("ALTER TABLE sales_orders ADD COLUMN ppda_compliance TEXT")
+                    branch_db.commit()
+            except Exception:
+                pass
         seed_suppliers(branch_db)
         seed_expenses(branch_db)
         seed_purchases(branch_db)

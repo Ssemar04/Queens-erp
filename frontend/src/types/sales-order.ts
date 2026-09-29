@@ -1,4 +1,18 @@
-export type OrderStatus = "submitted" | "declined" | "successful";
+export type OrderStatus =
+  | "draft"
+  | "advertised"
+  | "submitted"
+  | "submitted_egp"
+  | "bid_opened"
+  | "tech_eval"
+  | "fin_eval"
+  | "evaluated"
+  | "contracts_cmte"
+  | "awarded"
+  | "successful"
+  | "contract_signed"
+  | "complete"
+  | "declined";
 
 export interface QuotationAttachment {
   name: string;
@@ -71,6 +85,52 @@ export type DigitalPrinterSpec = { kind: "digital_printer"; pages: number }
 export type FargoSpec = { kind: "fargo"; sideMode: "single" | "double"; laminated: boolean }
 export type AssetCategorySpec = LargeFormatSpec | DigitalPrinterSpec | FargoSpec
 
+export type ProcurementMethod =
+  | "open_domestic"
+  | "open_international"
+  | "restricted_bidding"
+  | "request_for_quotation"
+  | "micro_procurement";
+
+export type ComplianceStatus = "valid" | "pending" | "expired" | "not_required";
+
+export interface PpdaComplianceDetails {
+  procurementMethod?: ProcurementMethod;
+  bidSecurityRequired?: boolean;
+  bidSecurityAmount?: number;
+  bidSecurityValidityDays?: number;
+  bidSecurityIssuer?: string;
+  isUgandanLocalContent?: boolean;
+  isMsmeReservationScheme?: boolean;
+  bebNoticeDate?: string;
+  administrativeReviewStandstillDays?: number;
+  uraTaxClearanceStatus?: "valid" | "pending" | "expired";
+  nssfClearanceStatus?: ComplianceStatus;
+  ppdaRopRegistered?: boolean;
+
+  uraTccStatus?: ComplianceStatus;
+  ppdaCertStatus?: ComplianceStatus;
+  ursbStatus?: ComplianceStatus;
+  auditedAccountsStatus?: ComplianceStatus;
+  bidSecurityStatus?: ComplianceStatus;
+  prnProofStatus?: ComplianceStatus;
+  declarationsStatus?: ComplianceStatus;
+
+  bidOpenedAt?: string;
+  techEvaluatedAt?: string;
+  finEvaluatedAt?: string;
+  awardedAt?: string;
+  contractSignedAt?: string;
+  standstillEndDate?: string;
+
+  evaluationCommittee?: string[];
+  contractsCommittee?: string[];
+
+  domesticContentPct?: number;
+  preferenceMarginPct?: number;
+  evaluatedPriceAdjusted?: number;
+}
+
 export interface SalesOrder {
   id: string;
   lpoNumber: string;
@@ -91,6 +151,7 @@ export interface SalesOrder {
   requiredDocumentTypes?: string[];
   accountDetails?: LpoAccountDetails;
   isLpoAccount?: boolean;
+  ppdaCompliance?: PpdaComplianceDetails;
   createdAt: string;
   updatedAt?: string;
 }

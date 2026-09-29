@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Receipt, Sparkles, TrendingUp, AlertTriangle } from "lucide-react";
+import { Plus, Receipt, Sparkles, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,9 @@ import { CSVExportButton, type CSVColumn } from "@/components/data/CSVExportButt
 import { PermissionGate } from "@/hooks/usePermissions";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { MovementType } from "@/types/inventory";
-import type { Item, SaleDetails, StockMovement, TransactionStatus } from "@/types/inventory";
+import { MovementType, buildSaleIncomeDescription, mapKindToIncomeSource } from "@/types/inventory";
+import type { Item, SaleDetails, SaleItem, StockMovement, TransactionStatus } from "@/types/inventory";
+import { getAssetCategoryKind } from "@/components/assets/assets-store";
 import {
   deleteMovementTransaction,
   fetchCatalogServiceItems,
@@ -20,6 +21,7 @@ import {
   saveMovementTransactions,
   updateMovementTransactionStatus,
 } from "@/lib/movements-backend-api";
+import { useAssetsStore } from "@/components/assets/assets-store";
 
 export const Route = createFileRoute("/app/movements")({
   component: TransactionsPage,
@@ -107,6 +109,7 @@ function TransactionsPage() {
     queryFn: () => fetchCatalogServiceItems(),
     initialData: [],
   });
+  const assetsStore = useAssetsStore();
 
   // Only show transactions that are actual sales (have sale details or are Shipped)
   const transactions = useMemo(
@@ -164,6 +167,107 @@ function TransactionsPage() {
             queryClient.invalidateQueries({ queryKey: ["db", "stock_movements"] }),
             queryClient.invalidateQueries({ queryKey: ["db", "items"] }),
           ]);
+
+          // ── Auto-sync asset income ─────────────────────────────
+          interface SaleLineContext {
+            lines: SaleItem[];
+            receipt: string;
+            date: string;
+            staff: string;
+            customer: string;
+          }
+          const groups = new Map<string, SaleLineContext>();
+
+          for (const sm of newMovements) {
+            const sale = sm.sale;
+            if (!sale) continue;
+            const lines: SaleItem[] = sale.lineItems?.length
+              ? sale.lineItems
+              : [{
+                  itemId: sm.itemId ?? null,
+                  itemName: sale.itemName ?? "",
+                  description: sale.description ?? null,
+                  unitPrice: sale.unitPrice,
+                  quantity: Math.abs(sm.quantity),
+                  discount: sale.discount,
+                  vat: sale.vat,
+                  vatRate: sale.vatRate ?? 0,
+                  assetId: sale.assetId ?? null,
+                  assetName: sale.assetName ?? null,
+                  assetCategory: null,
+                  assetCategorySpec: null,
+                  lineTotal: (sale.totalAmount || 0),
+                }];
+            for (const li of lines) {
+              if (!li.assetId) continue;
+              const key = `${li.assetId}__${sale.receiptNumber || sm.reference}`;
+              const existing = groups.get(key);
+              if (existing) {
+                existing.lines.push(li);
+              } else {
+                groups.set(key, {
+                  lines: [li],
+                  receipt: sale.receiptNumber || sm.reference || `TXN-${sm.id.slice(0, 6)}`,
+                  date: (sm.createdAt || sale.customerId || new Date().toISOString()).slice(0, 10),
+                  staff: sale.staff || sm.performedBy || "",
+                  customer: sale.customer || "Walk-in",
+                });
+              }
+            }
+          }
+
+          if (groups.size > 0) {
+            const addCalls: Promise<unknown>[] = [];
+            let skippedDupes = 0;
+
+            for (const [key, ctx] of groups.entries()) {
+              const assetId = key.split("__")[0];
+              if (!assetId) continue;
+              const asset = assetsStore.assets.find(a => a.id === assetId);
+              const duplicate = asset?.income?.some(
+                inc => inc.reference === ctx.receipt
+              );
+              if (duplicate) {
+                skippedDupes += 1;
+                continue;
+              }
+              const first = ctx.lines[0];
+              const kind = getAssetCategoryKind(first?.assetCategory ?? undefined);
+              const totalAmount = ctx.lines.reduce(
+                (s, li) => s + (Number(li.lineTotal) || 0), 0
+              );
+              const description = buildSaleIncomeDescription(kind, ctx.lines, ctx.customer);
+              const source = mapKindToIncomeSource(kind);
+              addCalls.push(
+                assetsStore.addIncome(assetId, {
+                  date: /^\d{4}-\d{2}-\d{2}$/.test(ctx.date) ? ctx.date : new Date().toISOString().slice(0, 10),
+                  source,
+                  amount: Number(totalAmount) || 0,
+                  currency: "UGX",
+                  description,
+                  reference: ctx.receipt,
+                  recordedBy: ctx.staff,
+                }).catch(() => { throw new Error(assetId); })
+              );
+            }
+
+            if (addCalls.length > 0 || skippedDupes > 0) {
+              const outcomes = await Promise.allSettled(addCalls);
+              const failed = outcomes.filter(o => o.status === "rejected").length;
+              const added = outcomes.filter(o => o.status === "fulfilled").length;
+              if (skippedDupes > 0) {
+                toast.info(`${skippedDupes} income ${skippedDupes === 1 ? "entry" : "entries"} already recorded on assets`, { duration: 3500 });
+              }
+              if (added > 0) {
+                toast.success(`${added} asset income ${added === 1 ? "entry" : "entries"} synced`, { duration: 3000 });
+              }
+              if (failed > 0) {
+                toast.warning(`${failed} asset income ${failed === 1 ? "entry" : "entries"} skipped — check logs`, { duration: 4500 });
+              }
+            }
+          }
+          // ── End auto-sync ─────────────────────────────────────
+
           const firstMovement = newMovements[0];
           toast.success(`Sale recorded - ${firstMovement?.sale?.receiptNumber ?? firstMovement?.reference ?? "receipt"}`, { duration: 4000 });
           setFormOpen(false);
@@ -176,7 +280,7 @@ function TransactionsPage() {
           setIsSaving(false);
         });
     },
-    [queryClient],
+    [queryClient, assetsStore],
   );
 
   const handleUpdateStatus = useCallback(

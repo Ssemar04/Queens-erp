@@ -5,8 +5,26 @@ from services.database import get_db, get_central_db
 from services.loyalty_tiers_service import get_tier_for_points
 
 
-VALID_STATUSES = {"submitted", "declined", "successful", "decline", "draft", "confirmed", "in_progress", "delivered", "cancelled"}
+PPDA_STATUSES = {"draft", "advertised", "submitted_egp", "bid_opened", "tech_eval", "fin_eval", "evaluated", "contracts_cmte", "awarded", "contract_signed", "complete", "declined"}
+LEGACY_STATUS_ALIASES = {
+    "submitted": "submitted_egp",
+    "successful": "awarded",
+    "decline": "declined",
+    "confirmed": "submitted_egp",
+    "in_progress": "tech_eval",
+    "delivered": "awarded",
+    "cancelled": "declined",
+}
+VALID_STATUSES = PPDA_STATUSES | set(LEGACY_STATUS_ALIASES.keys())
 VALID_PURCHASE_ORDER_STATUSES = {"draft", "submitted", "partial", "received", "cancelled"}
+
+
+def _normalize_status(status):
+    if status is None:
+        return "submitted_egp"
+    if status in PPDA_STATUSES:
+        return status
+    return LEGACY_STATUS_ALIASES.get(status, "submitted_egp")
 
 
 def current_timestamp():
@@ -76,6 +94,7 @@ def create_order(data):
     decline_reason = data.get("declineReason")
     req_docs = data.get("requiredDocumentTypes")
     acc_details = data.get("accountDetails")
+    ppda_compliance = data.get("ppdaCompliance")
     is_lpo_acc = 1 if data.get("isLpoAccount") else 0
 
     db.execute(
@@ -84,8 +103,8 @@ def create_order(data):
             id, lpo_number, date_received, customer_name, customer_id, customer_quotation,
             quotation_attachment, date_to_be_delivered, handled_by, employee_id, status,
             decline_reason, complaints, amount, notes, required_document_types, account_details,
-            is_lpo_account, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ppda_compliance, is_lpo_account, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             data["id"],
@@ -98,13 +117,14 @@ def create_order(data):
             data.get("dateToBeDelivered") or current_timestamp()[:10],
             handled_by,
             employee_id,
-            data.get("status") or "submitted",
+            _normalize_status(data.get("status")),
             decline_reason,
             json.dumps(complaints),
             amount,
             data.get("notes"),
             json.dumps(req_docs) if req_docs is not None else None,
             json.dumps(acc_details) if acc_details is not None else None,
+            json.dumps(ppda_compliance) if ppda_compliance is not None else None,
             is_lpo_acc,
             created_at,
             updated_at,
@@ -183,6 +203,7 @@ def update_order(order_id, data):
         "notes": "notes",
         "requiredDocumentTypes": "required_document_types",
         "accountDetails": "account_details",
+        "ppdaCompliance": "ppda_compliance",
         "isLpoAccount": "is_lpo_account",
         "updatedAt": "updated_at",
     }
@@ -203,11 +224,13 @@ def update_order(order_id, data):
             continue
 
         value = data[key]
-        if key == "quotationAttachment":
+        if key == "status":
+            value = _normalize_status(value)
+        elif key == "quotationAttachment":
             value = json.dumps(value) if value else None
         elif key == "complaints":
             value = json.dumps(value) if value else "[]"
-        elif key in ("requiredDocumentTypes", "accountDetails"):
+        elif key in ("requiredDocumentTypes", "accountDetails", "ppdaCompliance"):
             value = json.dumps(value) if value is not None else None
         elif key == "isLpoAccount":
             value = 1 if value else 0

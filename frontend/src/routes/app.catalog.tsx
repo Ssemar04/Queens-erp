@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, Sparkles, Package, TrendingUp, AlertTriangle, TrendingDown, ShoppingCart, Tag, Pencil, Trash2, Archive, CheckCircle2, Boxes, Search as SearchIcon, Clock, Layers3, ChevronRight } from "lucide-react";
+import { Plus, Upload, Sparkles, Package, TrendingUp, AlertTriangle, Tag, Pencil, Trash2, CheckCircle2, Boxes, Search as SearchIcon, Clock, Layers3, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ScrollText } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { CSVExportButton, type CSVColumn } from "@/components/data/CSVExportButton";
 import { CSVImportSheet, type ImportField } from "@/components/data/CSVImportSheet";
 import {

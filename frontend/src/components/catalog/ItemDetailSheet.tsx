@@ -4,17 +4,14 @@ import {
   X,
   Pencil,
   Archive,
-  Package,
   PlusCircle,
   ShoppingBag,
-  TrendingUp,
   Boxes,
   Calendar,
   User,
   Clock,
   CheckCircle2,
   XCircle,
-  Layers3,
   RefreshCw,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -71,7 +68,7 @@ function stockColor(item: Item) {
   return "text-stock-healthy";
 }
 
-const ORDER_STATUS_META: Record<OrderStatus, { label: string; cls: string; icon: typeof Clock }> = {
+const ORDER_STATUS_META: Partial<Record<OrderStatus, { label: string; cls: string; icon: typeof Clock }>> = {
   submitted: { label: "Submitted", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-500", icon: Clock },
   declined: { label: "Declined", cls: "bg-rose-500/10 text-rose-600 dark:text-rose-400", icon: XCircle },
   successful: { label: "Successful", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-500", icon: CheckCircle2 },
@@ -426,7 +423,7 @@ function ItemDetailSheetBody({
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="rounded-xl border border-border bg-white p-3 shadow-xs">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Sales Orders</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Bids & Tenders</span>
                     <div className="font-mono text-lg font-bold text-foreground mt-0.5">{itemSales.length}</div>
                   </div>
                   <div className="rounded-xl border border-border bg-white p-3 shadow-xs">
@@ -442,25 +439,26 @@ function ItemDetailSheetBody({
                 </div>
               </div>
 
-              {/* Sales Orders List */}
+              {/* Bids & Tenders List */}
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                  <span>Sales Orders Containing {item.name}</span>
-                  <span className="font-mono text-[11px] text-muted-foreground">{itemSales.length} order{itemSales.length === 1 ? "" : "s"}</span>
+                  <span>Bids & Tenders Containing {item.name}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">{itemSales.length} bid{itemSales.length === 1 ? "" : "s"}</span>
                 </h4>
 
                 {itemSales.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
                     <ShoppingBag className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                    <p className="mt-2 text-sm font-medium text-foreground">No sales recorded yet for this item</p>
+                    <p className="mt-2 text-sm font-medium text-foreground">No bids recorded yet for this item</p>
                     <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                      When sales orders are created containing this product, the LPO breakdown and income will automatically populate here.
+                      When bids are created containing this product, the LPO breakdown and contract income will automatically populate here.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
                     {itemSales.map(({ order, quantity, unitPrice, totalAmount }) => {
-                      const meta = ORDER_STATUS_META[order.status] || ORDER_STATUS_META.submitted;
+                      const defaultMeta = { label: "Submitted", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-500", icon: Clock };
+                      const meta = (order.status && ORDER_STATUS_META[order.status]) ? ORDER_STATUS_META[order.status]! : defaultMeta;
                       const StatusIcon = meta.icon;
                       return (
                         <div
@@ -542,7 +540,7 @@ function ItemDetailSheetBody({
             {/* Mode Selector */}
             <div className="space-y-1.5">
               <Label className="text-xs">Update Type</Label>
-              <Select value={updateMode} onValueChange={(v) => setUpdateMode(v as any)}>
+              <Select value={updateMode} onValueChange={(v) => setUpdateMode(v as "receive" | "reorder" | "adjust")}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>

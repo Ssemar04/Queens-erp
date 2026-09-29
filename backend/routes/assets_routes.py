@@ -62,6 +62,8 @@ def create_asset_route():
         asset = create_asset(data)
     except sqlite3.IntegrityError:
         return jsonify({"error": "An asset with that tag already exists"}), 409
+    except Exception as e:
+        return jsonify({"error": f"Failed to create asset: {str(e)}"}), 400
 
     return jsonify(asset_from_record(asset)), 201
 
@@ -79,6 +81,8 @@ def update_asset_route(asset_id):
         asset = update_asset(asset_id, data)
     except sqlite3.IntegrityError:
         return jsonify({"error": "An asset with that tag already exists"}), 409
+    except Exception as e:
+        return jsonify({"error": f"Failed to update asset: {str(e)}"}), 400
 
     if not asset:
         return jsonify({"error": "Asset not found"}), 404

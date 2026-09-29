@@ -8,9 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion } from "framer-motion";
 import {
-  Gauge, Wrench, ShieldAlert, CheckCircle2, AlertTriangle, Clock, Activity, TrendingUp,
-  Calendar, FileText, Plus, X, Package, Target, Beaker, Users, ArrowRightLeft, CircleDollarSign, History, Zap
+  Gauge, Wrench, ShieldAlert, CheckCircle2, Clock, Activity, TrendingUp,
+  Calendar, FileText, Plus, X, Package, Target, Beaker, Users, ArrowRightLeft, CircleDollarSign, History, Zap,
+  CreditCard, Ruler, Printer, Receipt as ReceiptIcon, Circle as CircleIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -67,6 +69,17 @@ function Body({
   }, [asset.income, thisMonthKey]);
   const staffName = resolveStaffName(asset.staff || "", user);
 
+  const saleLinkedIncomeCount = useMemo(() =>
+    (asset.income ?? []).filter(i => i.reference && (i.source || "").length > 0).length
+  , [asset.income]);
+
+  const thisMonthIncomeFromSales = useMemo(() => {
+    const m = thisMonthKey;
+    return (asset.income ?? []).reduce((s, i) =>
+      i.date.startsWith(m) && i.reference ? s + Number(i.amount ?? 0) : s, 0
+    );
+  }, [asset.income, thisMonthKey]);
+
   return (
     <>
       <SheetHeader>
@@ -78,11 +91,16 @@ function Body({
           <Badge variant="outline">{asset.category}</Badge>
           <Badge variant="outline">Staff · {asset.staff || "Unassigned"}</Badge>
           <StatusChip status={asset.status} />
+          {saleLinkedIncomeCount > 0 && (
+            <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 gap-1">
+              <ReceiptIcon className="h-3 w-3" /> {saleLinkedIncomeCount} sale{saleLinkedIncomeCount !== 1 ? "s" : ""} linked
+            </Badge>
+          )}
         </div>
       </SheetHeader>
 
-      {/* Top KPI strip - 4 KPIs, Book Value + Age REMOVED */}
-      <div className="mt-4 grid grid-cols-2 gap-2.5 md:grid-cols-4">
+      {/* Top KPI strip - 5 KPIs */}
+      <div className="mt-4 grid grid-cols-2 gap-2.5 md:grid-cols-5">
         <KPI icon={Gauge} label="Current meter" value={`${meter.toLocaleString()} ${asset.meterUnit}`} sub={`${thisMonthUsage.toLocaleString()} this month`} />
         <KPI icon={Wrench} label="Service health"
           value={health.state === "overdue" ? "Overdue" : health.state === "due_soon" ? "Due soon" : "Healthy"}
@@ -95,6 +113,12 @@ function Body({
           value={thisMonthTarget?.incomeTarget ? `${Math.min(100, Math.round((thisMonthIncome / thisMonthTarget.incomeTarget) * 100))}%` : "—"}
           sub={thisMonthTarget?.incomeTarget ? `${fmtKES(thisMonthIncome)} / ${fmtKES(thisMonthTarget.incomeTarget)}` : "Tap Targets tab to set"}
           tone={thisMonthTarget?.incomeTarget && (thisMonthIncome / thisMonthTarget.incomeTarget) >= 0.95 ? "ok" : undefined} />
+        <KPI icon={ReceiptIcon} label="Sales linked"
+          value={`${saleLinkedIncomeCount} entr${saleLinkedIncomeCount === 1 ? "y" : "ies"}`}
+          sub={saleLinkedIncomeCount > 0
+            ? `${fmtKES(thisMonthIncomeFromSales)} from sales this mo`
+            : "Link assets in sales to auto-populate"}
+          tone={saleLinkedIncomeCount > 0 ? "ok" : undefined} />
       </div>
 
       {/* Service pressure gauge */}
@@ -333,6 +357,64 @@ function FinanceTab({ asset }: { asset: Asset }) {
   const totalIncome = useMemo(() => filteredIncome.reduce((s, x) => s + Number(x.amount ?? 0), 0), [filteredIncome]);
   const sparkData = useMemo(() => groupIncomeByMonth(filteredIncome), [filteredIncome]);
 
+  function getSourceMeta(source: string | undefined) {
+    const s = (source || "").toLowerCase();
+    if (s.includes("fargo") || s.includes("badge")) {
+      return {
+        kind: "fargo" as const,
+        badgeCls: "bg-violet-50 border-violet-200 text-violet-700",
+        borderCls: "border-l-violet-400/60",
+        glowShadow: "hover:shadow-[0_0_0_1px_rgba(139,92,246,0.18),0_4px_20px_-8px_rgba(139,92,246,0.45)]",
+        Icon: CreditCard,
+        iconCls: "text-violet-600",
+        iconBg: "bg-violet-500/10",
+      };
+    }
+    if (s.includes("large") || s.includes("format")) {
+      return {
+        kind: "large_format" as const,
+        badgeCls: "bg-emerald-50 border-emerald-200 text-emerald-700",
+        borderCls: "border-l-emerald-400/60",
+        glowShadow: "hover:shadow-[0_0_0_1px_rgba(16,185,129,0.18),0_4px_20px_-8px_rgba(16,185,129,0.45)]",
+        Icon: Ruler,
+        iconCls: "text-emerald-600",
+        iconBg: "bg-emerald-500/10",
+      };
+    }
+    if (s.includes("digital") || s.includes("print")) {
+      return {
+        kind: "digital_printer" as const,
+        badgeCls: "bg-blue-50 border-blue-200 text-blue-700",
+        borderCls: "border-l-blue-400/60",
+        glowShadow: "hover:shadow-[0_0_0_1px_rgba(14,165,233,0.18),0_4px_20px_-8px_rgba(14,165,233,0.45)]",
+        Icon: Printer,
+        iconCls: "text-blue-600",
+        iconBg: "bg-blue-500/10",
+      };
+    }
+    return {
+      kind: "default" as const,
+      badgeCls: "bg-muted/40 border-border text-muted-foreground",
+      borderCls: "border-l-border",
+      glowShadow: "",
+      Icon: FileText,
+      iconCls: "text-muted-foreground",
+      iconBg: "bg-muted/50",
+    };
+  }
+
+  function parseFargoHints(desc: string | undefined): { side?: "Single" | "Double"; laminated?: boolean; qty?: number } {
+    const d = desc || "";
+    const hints: ReturnType<typeof parseFargoHints> = {};
+    if (/Double\s*side/i.test(d)) hints.side = "Double";
+    else if (/Single\s*side/i.test(d)) hints.side = "Single";
+    if (/Laminated/i.test(d)) hints.laminated = true;
+    else if (/No\s*lam/i.test(d)) hints.laminated = false;
+    const m = d.match(/×\s*(\d+)/);
+    if (m && m[1]) hints.qty = Number(m[1]) || undefined;
+    return hints;
+  }
+
   return (
     <TabsContent value="finance" className="mt-3 space-y-3">
       <style>{`
@@ -425,22 +507,97 @@ function FinanceTab({ asset }: { asset: Asset }) {
             <p className="mt-0.5 text-[11px] text-muted-foreground/80">Entries appear automatically once sales are linked</p>
           </div>
         ) : (
-          <div className="divide-y divide-border/50">
-            {filteredIncome.slice().sort((a, b) => b.date.localeCompare(a.date)).map((i) => (
-              <div key={i.id} className="relative flex items-start justify-between gap-3 px-4 py-2.5 transition-colors duration-200 hover:bg-emerald-50/40">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline" className="text-[10px] bg-white border-emerald-100 text-emerald-700">{i.source || "—"}</Badge>
-                    <span className="font-mono text-[10px] text-muted-foreground">{i.date}</span>
-                    {i.reference && <span className="font-mono text-[10px] text-muted-foreground">#{i.reference}</span>}
+          <motion.div
+            className="divide-y divide-border/50"
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04, delayChildren: 0.03 } } }}
+            initial="hidden"
+            animate="show"
+          >
+            {filteredIncome.slice().sort((a, b) => b.date.localeCompare(a.date)).map((i) => {
+              const meta = getSourceMeta(i.source);
+              const fargoHints = meta.kind === "fargo" ? parseFargoHints(i.description) : null;
+              const MetaIcon = meta.Icon;
+              return (
+                <motion.div
+                  key={i.id}
+                  variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0, transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } } }}
+                  onClick={() => {
+                    if (i.reference) {
+                      toast.info(`Linked to receipt #${i.reference} · check Transactions tab`, { duration: 3000 });
+                    }
+                  }}
+                  className={cn(
+                    "relative flex items-start justify-between gap-3 px-4 py-2.5 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer group border-l-[3px]",
+                    meta.borderCls,
+                    "hover:bg-[#003399]/[0.025] hover:-translate-y-px",
+                    meta.glowShadow,
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={cn("inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-[1.08]", meta.iconBg)}>
+                        <MetaIcon className={cn("h-3.5 w-3.5", meta.iconCls)} />
+                      </span>
+                      <Badge variant="outline" className={cn("text-[10px] border transition-transform duration-200 origin-left group-hover:scale-[1.03]", meta.badgeCls)}>
+                        {i.source || "—"}
+                      </Badge>
+                      <span className="font-mono text-[10px] text-muted-foreground">{i.date}</span>
+                      {i.reference && <span className="font-mono text-[10px] text-muted-foreground">#{i.reference}</span>}
+                      {meta.kind === "fargo" && fargoHints && (
+                        <>
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.12 }}
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border border-violet-500/25 bg-violet-500/10 text-violet-800 ring-1 ring-violet-500/10"
+                          >
+                            <CreditCard className="h-3 w-3" /> {fargoHints.side ?? "Single"} side
+                          </motion.span>
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.18 }}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border ring-1",
+                              fargoHints.laminated
+                                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-800 ring-emerald-500/10"
+                                : "border-slate-500/20 bg-slate-500/5 text-slate-600 ring-slate-500/10",
+                            )}
+                          >
+                            {fargoHints.laminated ? <CheckCircle2 className="h-3 w-3" /> : <CircleIcon className="h-3 w-3 opacity-50" />}
+                            {fargoHints.laminated ? "Laminated" : "No lamination"}
+                          </motion.span>
+                          {fargoHints.qty && fargoHints.qty > 0 && (
+                            <Badge variant="outline" className="text-[10px] font-mono border-violet-300 bg-white/60 text-violet-700">
+                              ×{fargoHints.qty} badges
+                            </Badge>
+                          )}
+                        </>
+                      )}
+                      {meta.kind === "fargo" && (
+                        <motion.div
+                          initial={{ opacity: 0, rotate: -4 }}
+                          animate={{ opacity: 1, rotate: 0 }}
+                          transition={{ delay: 0.24, type: "spring", stiffness: 400, damping: 20 }}
+                          className="ml-auto relative inline-flex"
+                          title="Badge job"
+                        >
+                          <div className="h-[20px] w-[32px] rounded-[4px] border border-violet-400/40 bg-[linear-gradient(135deg,#ede9fe_0%,#ffffff_50%,#ddd6fe_100%)] shadow-[0_1px_2px_rgba(139,92,246,0.2)]">
+                            <div className="absolute left-[4px] top-[6px] h-[4px] w-[4px] rounded-full bg-violet-400/70" />
+                            <div className="absolute left-[10px] top-[6px] h-[3px] w-[14px] rounded-full bg-violet-300/70" />
+                            <div className="absolute left-[10px] top-[11px] h-[2px] w-[10px] rounded-full bg-violet-300/50" />
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+                    {i.description && <p className="mt-0.5 truncate text-xs text-foreground/80 ml-9">{i.description}</p>}
+                    {i.recordedBy && <p className="text-[10px] text-muted-foreground/70 ml-9">Posted by {i.recordedBy}</p>}
                   </div>
-                  {i.description && <p className="mt-0.5 truncate text-xs text-foreground/80">{i.description}</p>}
-                  {i.recordedBy && <p className="text-[10px] text-muted-foreground/70">Posted by {i.recordedBy}</p>}
-                </div>
-                <span className="font-mono text-sm font-semibold tabular-nums text-emerald-700">{fmtKES(Number(i.amount ?? 0))}</span>
-              </div>
-            ))}
-          </div>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-emerald-700 self-start pt-0.5">{fmtKES(Number(i.amount ?? 0))}</span>
+                </motion.div>
+              );
+            })}
+          </motion.div>
         )}
       </div>
     </TabsContent>
