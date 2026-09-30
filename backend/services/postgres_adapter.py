@@ -22,14 +22,34 @@ def quote_identifier(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
 
 
+_SCHEMA_CONNECTIONS = {}
+
+
 def connect_schema(database_url: str, schema: str):
     if connect is None:
         raise RuntimeError("Postgres support requires installing psycopg[binary].")
-    raw_conn = connect(database_url, row_factory=dict_row)
+    cached = _SCHEMA_CONNECTIONS.get(schema)
+    if cached is not None:
+        cached_url, cached_conn = cached
+        if cached_url == database_url and cached_conn.is_alive():
+            return cached_conn
+        cached_conn.hard_close()
+        _SCHEMA_CONNECTIONS.pop(schema, None)
+    raw_conn = connect(
+        database_url,
+        row_factory=dict_row,
+        connect_timeout=10,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=3,
+    )
     raw_conn.execute(f"CREATE SCHEMA IF NOT EXISTS {quote_identifier(schema)}")
     raw_conn.execute(f"SET search_path TO {quote_identifier(schema)}, public")
     raw_conn.commit()
-    return PostgresConnection(raw_conn, schema)
+    wrapper = PostgresConnection(raw_conn, schema)
+    _SCHEMA_CONNECTIONS[schema] = (database_url, wrapper)
+    return wrapper
 
 
 def translate_sql(sql: str) -> str:
@@ -70,6 +90,14 @@ def translate_sql(sql: str) -> str:
     translated = re.sub(
         r"expires_at\s*>\s*CURRENT_TIMESTAMP",
         "expires_at::timestamptz > CURRENT_TIMESTAMP",
+        translated,
+        flags=re.IGNORECASE,
+    )
+    # Timestamp columns are TEXT in Postgres; assigning a bare timestamptz to them
+    # fails with "column is of type text but expression is of type timestamp".
+    translated = re.sub(
+        r"(\w+\s*=\s*)CURRENT_TIMESTAMP\b(?!\s*::)",
+        r"\1(CURRENT_TIMESTAMP::text)",
         translated,
         flags=re.IGNORECASE,
     )
@@ -190,6 +218,17 @@ class PostgresConnection:
         self._conn = conn
         self.schema = schema
 
+    def is_alive(self) -> bool:
+        try:
+            if self._conn.closed:
+                return False
+            self._conn.rollback()
+            self._conn.execute("SELECT 1")
+            self._conn.rollback()
+            return True
+        except Exception:
+            return False
+
     def execute(self, sql, params=None):
         cursor = PostgresCursor(self)
         return cursor.execute(sql, params)
@@ -209,7 +248,18 @@ class PostgresConnection:
         self._conn.rollback()
 
     def close(self):
-        self._conn.close()
+        # Connections are cached per schema and reused across requests; teardown
+        # only needs to discard uncommitted state, not drop the socket.
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass
+
+    def hard_close(self):
+        try:
+            self._conn.close()
+        except Exception:
+            pass
 
 
 class PostgresCursor:
