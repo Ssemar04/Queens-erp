@@ -448,40 +448,50 @@ def bank_statement_line_from_row(row):
 
 
 def ledger_entry_from_record(record):
+    if not record:
+        return None
     row, payments = record
-    try:
-        tags = json.loads(row["tags"] or "[]")
-    except json.JSONDecodeError:
-        tags = []
+
+    raw_tags = row["tags"] if "tags" in row.keys() else "[]"
+    tags = []
+    if isinstance(raw_tags, list):
+        tags = raw_tags
+    elif isinstance(raw_tags, str) and raw_tags.strip():
+        try:
+            parsed = json.loads(raw_tags)
+            if isinstance(parsed, list):
+                tags = parsed
+        except Exception:
+            tags = []
 
     return {
-        "id": row["id"],
-        "kind": row["kind"],
-        "reference": row["reference"],
-        "partyName": row["party_name"],
-        "partyRef": row["party_ref"],
-        "issueDate": row["issue_date"],
-        "dueDate": row["due_date"],
-        "amount": row["amount"],
-        "currency": row["currency"],
-        "paid": row["paid"],
-        "status": row["status"],
-        "notes": row["notes"],
-        "payments": [ledger_payment_from_row(payment) for payment in payments],
-        "promiseToPay": row["promise_to_pay"],
-        "tags": tags if isinstance(tags, list) else [],
-        "createdAt": row["created_at"],
+        "id": str(row["id"]),
+        "kind": str(row["kind"]),
+        "reference": str(row["reference"]),
+        "partyName": str(row["party_name"]),
+        "partyRef": row["party_ref"] if "party_ref" in row.keys() else None,
+        "issueDate": str(row["issue_date"]),
+        "dueDate": str(row["due_date"]),
+        "amount": float(row["amount"] or 0),
+        "currency": str(row["currency"] or "UGX") if "currency" in row.keys() else "UGX",
+        "paid": float(row["paid"] or 0),
+        "status": str(row["status"] or "open"),
+        "notes": row["notes"] if "notes" in row.keys() else None,
+        "payments": [ledger_payment_from_row(payment) for payment in (payments or [])],
+        "promiseToPay": row["promise_to_pay"] if "promise_to_pay" in row.keys() else None,
+        "tags": tags,
+        "createdAt": str(row["created_at"]),
     }
 
 
 def ledger_payment_from_row(row):
     return {
-        "id": row["id"],
-        "date": row["date"],
-        "amount": row["amount"],
-        "method": row["method"],
-        "reference": row["reference"],
-        "note": row["note"],
+        "id": str(row["id"]),
+        "date": str(row["date"]),
+        "amount": float(row["amount"] or 0),
+        "method": str(row["method"]),
+        "reference": row["reference"] if "reference" in row.keys() else None,
+        "note": row["note"] if "note" in row.keys() else None,
     }
 
 

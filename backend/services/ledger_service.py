@@ -71,7 +71,14 @@ def entry_with_payments(row):
 def compute_status(status, amount, paid, due_date):
     if status in {"draft", "disputed"}:
         return status
-    if max(0, float(amount or 0) - float(paid or 0)) <= 0.0001:
+    try:
+        amt = float(amount or 0)
+        pd = float(paid or 0)
+    except (ValueError, TypeError):
+        amt = 0.0
+        pd = 0.0
+
+    if max(0.0, amt - pd) <= 0.0001:
         return "paid"
 
     overdue = False
@@ -83,7 +90,7 @@ def compute_status(status, amount, paid, due_date):
         except Exception:
             overdue = False
 
-    if float(paid or 0) > 0:
+    if pd > 0:
         return "overdue" if overdue else "partial"
     return "overdue" if overdue else "open"
 
@@ -92,7 +99,7 @@ def create_entry(data):
     created_at = data.get("createdAt") or current_timestamp()
     amount = float(data.get("amount") or 0)
     paid = float(data.get("paid") or 0)
-    status = compute_status(data.get("status") or "open", amount, paid, data["dueDate"])
+    status = compute_status(data.get("status") or "open", amount, paid, data.get("dueDate"))
     payments = data.get("payments") if isinstance(data.get("payments"), list) else []
 
     get_db().execute(
@@ -144,10 +151,25 @@ def create_payment(entry_id, payment):
 
     create_payment_row(entry_id, payment)
     row, _ = entry
-    payment_amt = float(payment.get("amount") or 0)
-    paid = float(row["paid"] or 0) + payment_amt
-    total_amt = float(row["amount"] or 0)
-    status = compute_status(row["status"], total_amt, paid, row["due_date"])
+
+    try:
+        payment_amt = float(payment.get("amount") or 0)
+    except (ValueError, TypeError):
+        payment_amt = 0.0
+
+    try:
+        existing_paid = float(row["paid"] or 0)
+    except (ValueError, TypeError):
+        existing_paid = 0.0
+
+    try:
+        total_amt = float(row["amount"] or 0)
+    except (ValueError, TypeError):
+        total_amt = 0.0
+
+    paid = existing_paid + payment_amt
+    due_date_val = row["due_date"] if "due_date" in row.keys() else None
+    status = compute_status(row["status"], total_amt, paid, due_date_val)
 
     db = get_db()
     db.execute(
@@ -160,9 +182,16 @@ def create_payment(entry_id, payment):
     )
 
     # Sync debtor payment with customers table and transactions/orders tables safely
-    if row["kind"] == "debtor":
-        party_name = (row["party_name"] or "").strip()
-        party_ref = (row["party_ref"] or "").strip()
+    if str(row["kind"]).lower() == "debtor":
+        try:
+            party_name = (row["party_name"] or "").strip() if "party_name" in row.keys() else ""
+        except Exception:
+            party_name = ""
+
+        try:
+            party_ref = (row["party_ref"] or "").strip() if "party_ref" in row.keys() else ""
+        except Exception:
+            party_ref = ""
 
         if (party_ref or party_name) and table_exists(db, "customers"):
             sql_parts = []
@@ -192,7 +221,11 @@ def create_payment(entry_id, payment):
 
         rem_balance = max(0.0, total_amt - paid)
         new_txn_status = "paid" if rem_balance <= 0.0001 else "partial"
-        ref_num = (row["reference"] or "").strip()
+        try:
+            ref_num = (row["reference"] or "").strip() if "reference" in row.keys() else ""
+        except Exception:
+            ref_num = ""
+
         if ref_num:
             if table_exists(db, "sales_orders"):
                 try:
@@ -225,6 +258,15 @@ def create_payment(entry_id, payment):
 
 
 def create_payment_row(entry_id, payment):
+    ref_val = payment.get("reference")
+    note_val = payment.get("note")
+    created_at_val = payment.get("createdAt") or current_timestamp()
+
+    try:
+        amt = float(payment.get("amount") or 0)
+    except (ValueError, TypeError):
+        amt = 0.0
+
     get_db().execute(
         """
         INSERT INTO ledger_payments (
@@ -233,13 +275,13 @@ def create_payment_row(entry_id, payment):
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            payment["id"],
-            entry_id,
-            payment["date"],
-            float(payment.get("amount") or 0),
-            payment["method"],
-            payment.get("reference"),
-            payment.get("note"),
-            payment.get("createdAt") or current_timestamp(),
+            str(payment["id"]),
+            str(entry_id),
+            str(payment["date"]),
+            amt,
+            str(payment["method"]),
+            str(ref_val) if ref_val is not None else None,
+            str(note_val) if note_val is not None else None,
+            str(created_at_val),
         ),
     )
