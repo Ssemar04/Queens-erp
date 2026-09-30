@@ -1,7 +1,8 @@
 import json
 from datetime import datetime, timezone
 
-from services.database import get_db
+from services.database import get_db, table_exists
+import sys
 
 
 VALID_KINDS = {"debtor", "creditor"}
@@ -158,12 +159,12 @@ def create_payment(entry_id, payment):
         (paid, status, entry_id),
     )
 
-    # Sync debtor payment with customers table and transactions table
+    # Sync debtor payment with customers table and transactions/orders tables safely
     if row["kind"] == "debtor":
         party_name = (row["party_name"] or "").strip()
         party_ref = (row["party_ref"] or "").strip()
 
-        if party_ref or party_name:
+        if (party_ref or party_name) and table_exists(db, "customers"):
             sql_parts = []
             params = [payment_amt]
             if party_ref:
@@ -176,28 +177,48 @@ def create_payment(entry_id, payment):
                 params.append(party_name)
 
             if sql_parts:
-                db.execute(
-                    f"""
-                    UPDATE customers
-                    SET outstanding_balance = MAX(0.0, outstanding_balance - ?),
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE {" OR ".join(sql_parts)}
-                    """,
-                    params,
-                )
+                try:
+                    db.execute(
+                        f"""
+                        UPDATE customers
+                        SET outstanding_balance = MAX(0.0, outstanding_balance - ?),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE {" OR ".join(sql_parts)}
+                        """,
+                        params,
+                    )
+                except Exception as exc:
+                    print(f"[ledger_service] Customer update notice: {exc}", file=sys.stderr)
 
         rem_balance = max(0.0, total_amt - paid)
         new_txn_status = "paid" if rem_balance <= 0.0001 else "partial"
         ref_num = (row["reference"] or "").strip()
         if ref_num:
-            db.execute(
-                """
-                UPDATE transactions
-                SET balance = ?, amount_paid = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE transaction_number = ?
-                """,
-                (rem_balance, paid, new_txn_status, ref_num),
-            )
+            if table_exists(db, "sales_orders"):
+                try:
+                    db.execute(
+                        """
+                        UPDATE sales_orders
+                        SET status = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE lpo_number = ?
+                        """,
+                        (new_txn_status if new_txn_status == "paid" else "submitted", ref_num),
+                    )
+                except Exception as exc:
+                    print(f"[ledger_service] sales_orders update notice: {exc}", file=sys.stderr)
+
+            if table_exists(db, "transactions"):
+                try:
+                    db.execute(
+                        """
+                        UPDATE transactions
+                        SET balance = ?, amount_paid = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE transaction_number = ?
+                        """,
+                        (rem_balance, paid, new_txn_status, ref_num),
+                    )
+                except Exception as exc:
+                    print(f"[ledger_service] transactions update notice: {exc}", file=sys.stderr)
 
     db.commit()
     return get_entry(entry_id)
