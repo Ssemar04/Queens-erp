@@ -260,6 +260,8 @@ def create_payment(entry_id, payment):
 def create_payment_row(entry_id, payment):
     ref_val = payment.get("reference")
     note_val = payment.get("note")
+    received_by_val = payment.get("receivedBy")
+    staff_id_val = payment.get("staffId")
     created_at_val = payment.get("createdAt") or current_timestamp()
 
     try:
@@ -270,9 +272,10 @@ def create_payment_row(entry_id, payment):
     get_db().execute(
         """
         INSERT INTO ledger_payments (
-            id, entry_id, date, amount, method, reference, note, created_at
+            id, entry_id, date, amount, method, reference, note,
+            received_by, staff_id, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             str(payment["id"]),
@@ -282,6 +285,8 @@ def create_payment_row(entry_id, payment):
             str(payment["method"]),
             str(ref_val) if ref_val is not None else None,
             str(note_val) if note_val is not None else None,
+            str(received_by_val).strip() if received_by_val else None,
+            str(staff_id_val).strip() if staff_id_val else None,
             str(created_at_val),
         ),
     )

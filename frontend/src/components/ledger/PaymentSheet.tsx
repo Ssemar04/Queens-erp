@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Calendar, Hash, Wallet, FileText, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Calendar, Hash, Wallet, FileText, CheckCircle2, User } from "lucide-react";
 import { toast } from "sonner";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useEmployees } from "@/components/employees/employees-store";
+import { useBranch } from "@/contexts/BranchContext";
 import { balance, type LedgerEntry, type Payment } from "./ledger-store";
 
 interface Props {
@@ -30,7 +32,27 @@ function PaymentSheetBody({
   const [method, setMethod] = useState<Payment["method"]>("mpesa");
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
+  const [staffId, setStaffId] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const { employees } = useEmployees();
+  const { currentBranchId } = useBranch();
+
+  const branchStaff = useMemo(
+    () =>
+      employees.filter((e) => {
+        const statusOk =
+          !e.status ||
+          e.status.toLowerCase() === "active" ||
+          e.status.toLowerCase() === "probation";
+        if (!statusOk) return false;
+        if (!currentBranchId) return true;
+        return e.branchId === currentBranchId || !e.branchId;
+      }),
+    [employees, currentBranchId],
+  );
+
+  const selectedStaff = branchStaff.find((e) => e.id === staffId) ?? null;
 
   useEffect(() => {
     if (open && entry) {
@@ -39,6 +61,7 @@ function PaymentSheetBody({
       setMethod("mpesa");
       setReference("");
       setNote("");
+      setStaffId("");
       setSubmitting(false);
     }
   }, [open, entry]);
@@ -58,6 +81,8 @@ function PaymentSheetBody({
         method,
         reference: reference.trim() || undefined,
         note: note.trim() || undefined,
+        receivedBy: selectedStaff?.name || undefined,
+        staffId: selectedStaff?.id || undefined,
       });
       toast.success(
         entry.kind === "debtor"
@@ -139,6 +164,22 @@ function PaymentSheetBody({
             </Select>
           </Field>
 
+          <Field label="Received by (staff)" icon={User}>
+            <Select value={staffId} onValueChange={setStaffId}>
+              <SelectTrigger className="text-xs bg-white">
+                <SelectValue placeholder={branchStaff.length ? "Select staff" : "No staff in this branch"} />
+              </SelectTrigger>
+              <SelectContent>
+                {branchStaff.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                    {s.role ? ` · ${s.role}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
           <Field label="Reference / Transaction ID" icon={FileText}>
             <Input
               value={reference}
@@ -171,6 +212,9 @@ function PaymentSheetBody({
                       <span className="font-semibold text-foreground">{p.method.toUpperCase()}</span>
                       {p.reference && <span className="font-mono text-[11px] text-muted-foreground ml-1.5">({p.reference})</span>}
                       <span className="block text-[10px] text-muted-foreground">{p.date}</span>
+                      {p.receivedBy && (
+                        <span className="block text-[10px] text-muted-foreground">by {p.receivedBy}</span>
+                      )}
                     </div>
                     <span className="font-mono font-semibold text-emerald-700">+UGX {p.amount.toLocaleString()}</span>
                   </div>

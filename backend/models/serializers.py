@@ -485,13 +485,16 @@ def ledger_entry_from_record(record):
 
 
 def ledger_payment_from_row(row):
+    keys = row.keys()
     return {
         "id": str(row["id"]),
         "date": str(row["date"]),
         "amount": float(row["amount"] or 0),
         "method": str(row["method"]),
-        "reference": row["reference"] if "reference" in row.keys() else None,
-        "note": row["note"] if "note" in row.keys() else None,
+        "reference": row["reference"] if "reference" in keys else None,
+        "note": row["note"] if "note" in keys else None,
+        "receivedBy": row["received_by"] if "received_by" in keys else None,
+        "staffId": row["staff_id"] if "staff_id" in keys else None,
     }
 
 

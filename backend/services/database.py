@@ -15,6 +15,13 @@ DEFAULT_ADMIN_EMAIL = os.getenv("QTERP_ADMIN_EMAIL", "admin@queenstech.com")
 DEFAULT_ADMIN_PASSWORD = os.getenv("QTERP_ADMIN_PASSWORD", "admin123")
 DEFAULT_ADMIN_NAME = os.getenv("QTERP_ADMIN_NAME", "House")
 
+# Branch schemas are persistent (sqlite files / Postgres schemas), so the schema
+# bootstrap only needs to run once per process per branch — not on every request.
+# Re-running ~40 DDL statements per request is cheap on local sqlite but causes
+# dozens of network round-trips on remote Postgres, which can exceed the gunicorn
+# worker timeout and surface as 502s.
+_INITIALIZED_BRANCH_KEYS = set()
+
 
 def use_postgres() -> bool:
     return DATABASE_URL.startswith(("postgres://", "postgresql://"))
@@ -118,7 +125,7 @@ def get_branch_db(branch_id=None):
                 conn.execute("PRAGMA synchronous = NORMAL")
                 conn.execute("PRAGMA temp_store = MEMORY")
             g.branch_dbs[clean_id] = conn
-            init_branch_db_tables(conn)
+            ensure_branch_tables(conn, clean_id)
         return g.branch_dbs[clean_id]
     except RuntimeError:
         # Outside Flask app context
@@ -135,7 +142,7 @@ def get_branch_db(branch_id=None):
             conn.execute("PRAGMA journal_mode = WAL")
             conn.execute("PRAGMA synchronous = NORMAL")
             conn.execute("PRAGMA temp_store = MEMORY")
-        init_branch_db_tables(conn)
+        ensure_branch_tables(conn, clean_id)
         return conn
 
 
@@ -599,6 +606,22 @@ def init_central_db(db):
     db.commit()
 
 
+def _branch_init_key(clean_id: str) -> str:
+    if use_postgres():
+        from services.postgres_adapter import schema_name_for_branch
+
+        return "pg:" + schema_name_for_branch(clean_id)
+    return "sqlite:" + str(get_branch_db_path(clean_id))
+
+
+def ensure_branch_tables(conn, clean_id: str):
+    key = _branch_init_key(clean_id)
+    if key in _INITIALIZED_BRANCH_KEYS:
+        return
+    init_branch_db_tables(conn)
+    _INITIALIZED_BRANCH_KEYS.add(key)
+
+
 def init_branch_db_tables(db):
     db.executescript(
         """
@@ -883,6 +906,8 @@ def init_branch_db_tables(db):
             method TEXT NOT NULL,
             reference TEXT,
             note TEXT,
+            received_by TEXT,
+            staff_id TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (entry_id) REFERENCES ledger_entries (id) ON DELETE CASCADE
         );
@@ -1148,6 +1173,10 @@ def init_branch_db_tables(db):
         ("is_lpo_account", "INTEGER DEFAULT 0"),
     ])
     add_missing_columns(db, "bank_transactions", [("performed_by", "TEXT NOT NULL DEFAULT ''")])
+    add_missing_columns(db, "ledger_payments", [
+        ("received_by", "TEXT"),
+        ("staff_id", "TEXT"),
+    ])
     add_missing_columns(db, "assets", [
         ("staff", "TEXT NOT NULL DEFAULT ''"),
         ("serial_number", "TEXT NOT NULL DEFAULT ''"),

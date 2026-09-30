@@ -3,7 +3,7 @@ import {
   Plus, Search, Wallet, AlertTriangle, TrendingUp, Clock, Banknote,
   ArrowDownToLine, ArrowUpFromLine, Sparkles, Trash2, Calendar,
   Eye, CheckCircle2, FileText, Landmark, CreditCard, BadgeDollarSign, Receipt,
-  RefreshCw, Database,
+  RefreshCw, Database, User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -783,6 +783,11 @@ function EntryPreviewDialog({
                             {p.reference && (
                               <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono">
                                 Ref: {p.reference}
+                              </span>
+                            )}
+                            {p.receivedBy && (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                <User className="h-3 w-3" /> {p.receivedBy}
                               </span>
                             )}
                             {p.note && (

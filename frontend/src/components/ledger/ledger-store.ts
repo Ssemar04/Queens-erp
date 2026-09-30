@@ -17,6 +17,8 @@ export interface Payment {
   method: "cash" | "mpesa" | "bank" | "cheque" | "card";
   reference?: string;
   note?: string;
+  receivedBy?: string;
+  staffId?: string;
 }
 
 export interface LedgerEntry {
