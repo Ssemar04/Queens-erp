@@ -62,6 +62,12 @@ def translate_sql(sql: str) -> str:
     )
     translated = _drop_table_foreign_keys(translated)
     translated = re.sub(
+        r"\bMAX\s*\(\s*([0-9.\w\s\-+?]+)\s*,\s*([^)]+)\)",
+        r"GREATEST(\1, \2)",
+        translated,
+        flags=re.IGNORECASE,
+    )
+    translated = re.sub(
         r"expires_at\s*>\s*CURRENT_TIMESTAMP",
         "expires_at::timestamptz > CURRENT_TIMESTAMP",
         translated,
@@ -240,8 +246,8 @@ class PostgresCursor:
                 row = self._cursor.fetchone()
                 self.lastrowid = row["id"] if row else None
         except Exception as exc:
+            self._conn.rollback()
             if errors is not None and isinstance(exc, errors.IntegrityError):
-                self._conn.rollback()
                 raise sqlite3.IntegrityError(str(exc)) from exc
             raise
         return self
@@ -253,8 +259,8 @@ class PostgresCursor:
             self._cursor.executemany(translated, seq_of_params)
             self.rowcount = self._cursor.rowcount
         except Exception as exc:
+            self._conn.rollback()
             if errors is not None and isinstance(exc, errors.IntegrityError):
-                self._conn.rollback()
                 raise sqlite3.IntegrityError(str(exc)) from exc
             raise
         return self

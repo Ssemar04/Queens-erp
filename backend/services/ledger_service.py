@@ -210,11 +210,11 @@ def create_payment(entry_id, payment):
                     db.execute(
                         f"""
                         UPDATE customers
-                        SET outstanding_balance = MAX(0.0, outstanding_balance - ?),
+                        SET outstanding_balance = CASE WHEN outstanding_balance >= ? THEN outstanding_balance - ? ELSE 0.0 END,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE {" OR ".join(sql_parts)}
                         """,
-                        params,
+                        [payment_amt, payment_amt] + params[1:],
                     )
                 except Exception as exc:
                     print(f"[ledger_service] Customer update notice: {exc}", file=sys.stderr)
