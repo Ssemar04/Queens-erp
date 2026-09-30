@@ -3,6 +3,7 @@ import {
   Plus, Search, Wallet, AlertTriangle, TrendingUp, Clock, Banknote,
   ArrowDownToLine, ArrowUpFromLine, Sparkles, Trash2, Calendar,
   Eye, CheckCircle2, FileText, Landmark, CreditCard, BadgeDollarSign, Receipt,
+  RefreshCw, Database,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -49,13 +50,24 @@ interface Props {
 }
 
 export function LedgerPage({ kind }: Props) {
-  const { ready, entries, add, remove, pay } = useLedger(kind);
+  const { ready, entries, add, remove, pay, reload } = useLedger(kind);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<EntryStatus | "all">("all");
   const [bucketFilter, setBucketFilter] = useState<ReturnType<typeof bucket> | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
   const [paying, setPaying] = useState<LedgerEntry | null>(null);
   const [previewing, setPreviewing] = useState<LedgerEntry | null>(null);
+  const [reloading, setReloading] = useState(false);
+
+  const handleReload = async () => {
+    setReloading(true);
+    try {
+      await reload();
+      toast.success("Database records synced successfully");
+    } finally {
+      setReloading(false);
+    }
+  };
 
   const isDebtor = kind === "debtor";
   const titles = isDebtor
@@ -162,6 +174,16 @@ export function LedgerPage({ kind }: Props) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1 md:pt-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleReload}
+              disabled={reloading}
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20 backdrop-blur"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", reloading && "animate-spin")} />
+              Refresh DB
+            </Button>
             <Button
               size="sm"
               onClick={() => setFormOpen(true)}

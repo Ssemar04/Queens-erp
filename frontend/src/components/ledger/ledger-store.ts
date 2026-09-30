@@ -81,43 +81,35 @@ export function useLedger(kind: LedgerKind) {
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadEntries() {
-      setReady(false);
-      try {
-        const nextEntries = await getLedgerEntries(kind);
-        if (!cancelled) {
-          setEntries(nextEntries);
-        }
-      } catch {
-        if (!cancelled) {
-          toast.error(`Could not load ${kind === "debtor" ? "debtors" : "creditors"}`);
-        }
-      } finally {
-        if (!cancelled) {
-          setReady(true);
-        }
-      }
+  const reload = useCallback(async () => {
+    setReady(false);
+    try {
+      const nextEntries = await getLedgerEntries(kind);
+      setEntries(nextEntries);
+    } catch {
+      toast.error(`Could not load ${kind === "debtor" ? "debtors" : "creditors"}`);
+    } finally {
+      setReady(true);
     }
+  }, [kind]);
 
-    loadEntries();
+  useEffect(() => {
+    reload();
     const handleBranchChange = () => {
-      loadEntries();
+      reload();
     };
     window.addEventListener("qterp:branch-changed", handleBranchChange);
 
     return () => {
-      cancelled = true;
       window.removeEventListener("qterp:branch-changed", handleBranchChange);
     };
-  }, [kind]);
+  }, [reload]);
 
   const add = useCallback(
     async (entry: LedgerEntry) => {
       const created = await createLedgerEntry(kind, { ...entry, status: computeStatus(entry) });
       setEntries((current) => [created, ...current]);
+      toast.success(`${kind === "debtor" ? "Debtor invoice" : "Creditor bill"} posted to database`);
       return created;
     },
     [kind],
@@ -127,6 +119,7 @@ export function useLedger(kind: LedgerKind) {
     async (id: string) => {
       await deleteLedgerEntry(kind, id);
       setEntries((current) => current.filter((e) => e.id !== id));
+      toast.success(`Entry removed from database`);
     },
     [kind],
   );
@@ -146,5 +139,6 @@ export function useLedger(kind: LedgerKind) {
     add,
     remove,
     pay,
+    reload,
   };
 }
