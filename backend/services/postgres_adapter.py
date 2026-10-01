@@ -101,6 +101,12 @@ def translate_sql(sql: str) -> str:
         translated,
         flags=re.IGNORECASE,
     )
+    translated = re.sub(
+        r"\bCREATE\s+VIEW\s+IF\s+NOT\s+EXISTS\b",
+        "CREATE OR REPLACE VIEW",
+        translated,
+        flags=re.IGNORECASE,
+    )
     translated = _replace_qmark_placeholders(translated)
     translated = _escape_percent_signs_in_literals(translated)
 
