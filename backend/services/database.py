@@ -1149,6 +1149,36 @@ def init_branch_db_tables(db):
 
         CREATE INDEX IF NOT EXISTS idx_notifications_user_visible
             ON notifications(user_id, dismissed_at, is_read, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS loss_records (
+            id TEXT PRIMARY KEY,
+            reference TEXT NOT NULL UNIQUE,
+            date TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'inventory',
+            item_id TEXT,
+            item_name TEXT NOT NULL DEFAULT '',
+            asset_id TEXT,
+            asset_name TEXT NOT NULL DEFAULT '',
+            quantity REAL NOT NULL DEFAULT 0,
+            unit_value REAL NOT NULL DEFAULT 0,
+            total_value REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT 'UGX',
+            reason_code TEXT NOT NULL DEFAULT 'other',
+            description TEXT NOT NULL DEFAULT '',
+            location_id TEXT,
+            reported_by TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'reported',
+            approved_by TEXT,
+            status_note TEXT,
+            insurance_claim INTEGER NOT NULL DEFAULT 0,
+            attachment TEXT,
+            movement_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_loss_records_date
+            ON loss_records(date DESC, created_at DESC);
         """
     )
     default_tiers = [

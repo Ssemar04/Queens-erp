@@ -40,7 +40,7 @@ def require_manager_user():
     user, error = require_current_user()
     if error:
         return None, error
-    role = (user.get("role") or "").lower()
+    role = str(user["role"] or "").lower()
     if role not in {"admin", "manager"}:
         return None, (jsonify({
             "success": False,

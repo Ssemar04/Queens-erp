@@ -19,6 +19,7 @@ import {
   Boxes,
   FileBarChart2,
   Gavel,
+  AlertTriangle,
 } from "lucide-react";
 
 
@@ -38,6 +39,7 @@ export const PAGES: PageDef[] = [
   { label: "Debtors", path: "/app/debtors", icon: <ArrowDownToLine className="h-4 w-4" /> },
   { label: "Creditors", path: "/app/creditors", icon: <ArrowUpFromLine className="h-4 w-4" /> },
   { label: "Expenses", path: "/app/expenses", icon: <Receipt className="h-4 w-4" /> },
+  { label: "Losses", path: "/app/losses", icon: <AlertTriangle className="h-4 w-4" /> },
   { label: "Employees", path: "/app/employees", icon: <UserSquare2 className="h-4 w-4" /> },
   { label: "Chatroom", path: "/app/chat", icon: <MessageSquare className="h-4 w-4" /> },
   { label: "Assets", path: "/app/assets", icon: <Boxes className="h-4 w-4" /> },

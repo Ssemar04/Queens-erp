@@ -559,6 +559,42 @@ def expense_audit_from_row(row):
     }
 
 
+def loss_from_row(row):
+    def get(col, default=None):
+        try:
+            value = row[col]
+        except (KeyError, IndexError, TypeError):
+            return default
+        return default if value is None else value
+
+    return {
+        "id": get("id"),
+        "reference": get("reference"),
+        "date": get("date"),
+        "kind": get("kind", "inventory"),
+        "itemId": get("item_id"),
+        "itemName": get("item_name", ""),
+        "assetId": get("asset_id"),
+        "assetName": get("asset_name", ""),
+        "quantity": float(get("quantity", 0) or 0),
+        "unitValue": float(get("unit_value", 0) or 0),
+        "totalValue": float(get("total_value", 0) or 0),
+        "currency": get("currency", "UGX"),
+        "reasonCode": get("reason_code", "other"),
+        "description": get("description", ""),
+        "locationId": get("location_id"),
+        "reportedBy": get("reported_by", ""),
+        "status": get("status", "reported"),
+        "approvedBy": get("approved_by"),
+        "statusNote": get("status_note"),
+        "insuranceClaim": bool(get("insurance_claim", 0)),
+        "attachment": get("attachment"),
+        "movementId": get("movement_id"),
+        "createdAt": get("created_at"),
+        "updatedAt": get("updated_at"),
+    }
+
+
 def customer_interaction_from_row(row):
     return {
         "id": row["id"],

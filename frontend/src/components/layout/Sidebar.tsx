@@ -19,6 +19,7 @@ import {
   Boxes,
   FileBarChart2,
   Gavel,
+  AlertTriangle,
 } from "lucide-react";
 
 import { Link, useLocation } from "@tanstack/react-router";
@@ -56,6 +57,7 @@ const navGroups: NavGroup[] = [
       { label: "Debtors", href: "/app/debtors", icon: ArrowDownToLine },
       { label: "Creditors", href: "/app/creditors", icon: ArrowUpFromLine },
       { label: "Expenses", href: "/app/expenses", icon: Receipt },
+      { label: "Losses", href: "/app/losses", icon: AlertTriangle },
     ],
   },
   {

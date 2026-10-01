@@ -22,6 +22,7 @@ export const ALL_SYSTEM_MODULES: SystemModule[] = [
   { id: "debtors", name: "Debtors", path: "/app/debtors", group: "Finance", description: "Customer outstanding debt balances" },
   { id: "creditors", name: "Creditors", path: "/app/creditors", group: "Finance", description: "Supplier payables & liability management" },
   { id: "expenses", name: "Expenses", path: "/app/expenses", group: "Finance", description: "Business operating expense tracking" },
+  { id: "losses", name: "Losses", path: "/app/losses", group: "Finance", description: "Loss & damage register for stock, assets, and cash" },
 
   // Workplace & Procurement
   { id: "employees", name: "Employees", path: "/app/employees", group: "Workplace & Procurement", description: "Staff directory & access control" },
@@ -59,7 +60,7 @@ export const ACCESS_ROLE_PRESETS: AccessRolePreset[] = [
     description: "Operational management across sales, inventory, finance, suppliers, and reports.",
     allowedModules: [
       "Dashboard", "Inventory", "Bids", "Customers", "Transactions", "Branches",
-      "Bank", "Debtors", "Creditors", "Expenses", "Chatroom", "Assets", "Reports", "Supplies", "Help"
+      "Bank", "Debtors", "Creditors", "Expenses", "Losses", "Chatroom", "Assets", "Reports", "Supplies", "Help"
     ],
   },
   {
@@ -81,7 +82,7 @@ export const ACCESS_ROLE_PRESETS: AccessRolePreset[] = [
     label: "Accountant",
     badgeColor: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30",
     description: "Full financial visibility: bank accounts, debtors, creditors, expenses, transactions, and reports.",
-    allowedModules: ["Bank", "Debtors", "Creditors", "Expenses", "Transactions", "Reports", "Chatroom", "Help"],
+    allowedModules: ["Bank", "Debtors", "Creditors", "Expenses", "Losses", "Transactions", "Reports", "Chatroom", "Help"],
   },
   {
     id: "custom",
@@ -118,7 +119,7 @@ export const SYSTEM_ROLES: Record<UserRoleType, RoleInfo> = {
     description: "Operational management of inventory, sales, customers, transactions, finance, procurement, and reports.",
     accessibleModules: [
       "Dashboard", "Inventory", "Bids", "Customers", "Transactions", "Branches",
-      "Bank", "Debtors", "Creditors", "Expenses", "Chatroom", "Assets", "Reports", "Supplies", "Help"
+      "Bank", "Debtors", "Creditors", "Expenses", "Losses", "Chatroom", "Assets", "Reports", "Supplies", "Help"
     ],
   },
   staff: {

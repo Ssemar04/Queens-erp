@@ -11,6 +11,7 @@ const ROUTE_ACCESS: Record<string, UserRoleType[]> = {
   "/app/debtors": ["admin", "manager"], // Debtors
   "/app/creditors": ["admin", "manager"], // Creditors
   "/app/expenses": ["admin", "manager"], // Expenses
+  "/app/losses": ["admin", "manager"], // Losses & damages register
   "/app/chat": ["admin", "manager", "staff"], // Chatroom
   "/app/assets": ["admin", "manager", "staff"], // Assets
   "/app/purchases": ["admin", "manager", "staff"], // Purchases

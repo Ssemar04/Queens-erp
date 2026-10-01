@@ -2,6 +2,7 @@ import axios from "axios";
 import type { BankAccount, BankTxn, StatementLine } from "@/components/bank/bank-store";
 import type { AuditEntry, Expense } from "@/components/expenses/expenses-store";
 import type { LedgerEntry, LedgerKind, Payment } from "@/components/ledger/ledger-store";
+import type { LossDraft, LossRecord, LossStatus } from "@/components/losses/loss-store";
 import type { Branch, Category, Item, Location, Notification, PurchaseOrder, StockMovement, Supplier } from "@/types/inventory";
 import type { SalesOrder, SalesOrderDocument } from "@/types/sales-order";
 import type { ItemFilters } from "@/lib/demo-store";
@@ -532,6 +533,37 @@ export const createLedgerPayment = async (
 ): Promise<LedgerEntry> => {
   const response = await api.post(`/ledger/${kind}/${id}/payments`, payment);
   return response.data;
+};
+
+export const getLosses = async (): Promise<LossRecord[]> => {
+  const response = await api.get("/losses");
+  return response.data?.losses ?? [];
+};
+
+export const createLoss = async (draft: LossDraft): Promise<LossRecord> => {
+  const response = await api.post("/losses", draft);
+  return response.data;
+};
+
+export const updateLoss = async (
+  id: string,
+  patch: Partial<LossRecord>,
+): Promise<LossRecord> => {
+  const response = await api.patch(`/losses/${id}`, patch);
+  return response.data;
+};
+
+export const setLossStatus = async (
+  id: string,
+  status: LossStatus,
+  note?: string,
+): Promise<LossRecord> => {
+  const response = await api.post(`/losses/${id}/status`, { status, note });
+  return response.data;
+};
+
+export const deleteLoss = async (id: string): Promise<void> => {
+  await api.delete(`/losses/${id}`);
 };
 
 export interface ExpensesState {
