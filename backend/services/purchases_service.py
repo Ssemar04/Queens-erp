@@ -1,6 +1,8 @@
+import sys
 import uuid
 from datetime import datetime, timezone
 from services.database import get_db
+from services import ledger_service
 
 VALID_PAYMENT_STATUSES = {"unpaid", "partially_paid", "paid"}
 VALID_ORDER_STATUSES = {"draft", "ordered", "received", "cancelled"}
@@ -8,6 +10,16 @@ VALID_ORDER_STATUSES = {"draft", "ordered", "received", "cancelled"}
 
 def current_timestamp():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _sync_creditor_safe(purchase_row):
+    """Mirror an outstanding purchase into the creditors ledger; never raises."""
+    if not purchase_row:
+        return
+    try:
+        ledger_service.sync_creditor_from_purchase(purchase_row)
+    except Exception as exc:
+        print(f"[purchases_service] creditor sync notice: {exc}", file=sys.stderr)
 
 
 def list_purchases():
@@ -84,7 +96,9 @@ def create_purchase(data):
         ),
     )
     db.commit()
-    return get_purchase(purchase_id)
+    row = get_purchase(purchase_id)
+    _sync_creditor_safe(row)
+    return row
 
 
 def update_purchase(purchase_id, data):
@@ -123,11 +137,17 @@ def update_purchase(purchase_id, data):
     values.extend([current_timestamp(), purchase_id])
     db.execute(f"UPDATE purchases SET {', '.join(assignments)} WHERE id = ?", values)
     db.commit()
-    return get_purchase(purchase_id)
+    row = get_purchase(purchase_id)
+    _sync_creditor_safe(row)
+    return row
 
 
 def delete_purchase(purchase_id):
     db = get_db()
+    try:
+        ledger_service.remove_creditor_for_purchase(purchase_id)
+    except Exception as exc:
+        print(f"[purchases_service] creditor cleanup notice: {exc}", file=sys.stderr)
     cursor = db.execute("DELETE FROM purchases WHERE id = ?", (purchase_id,))
     db.commit()
     return cursor.rowcount

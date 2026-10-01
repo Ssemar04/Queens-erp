@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 import uuid
 
 from flask import Blueprint, jsonify, request
@@ -30,6 +31,13 @@ def list_ledger_entries(kind):
 
     if not validate_kind(kind):
         return jsonify({"success": False, "message": "Invalid ledger kind"}), 400
+
+    if kind == "creditor":
+        # Keep supplier payables in step with outstanding purchases on every view.
+        try:
+            ledger_service.reconcile_creditors_from_purchases()
+        except Exception as exc:
+            print(f"[ledger_routes] creditor reconcile notice: {exc}", file=sys.stderr)
 
     return jsonify([ledger_entry_from_record(record) for record in ledger_service.list_entries(kind)])
 

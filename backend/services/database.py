@@ -886,6 +886,7 @@ def init_branch_db_tables(db):
             reference TEXT NOT NULL,
             party_name TEXT NOT NULL,
             party_ref TEXT,
+            source_purchase_id TEXT,
             issue_date TEXT NOT NULL,
             due_date TEXT NOT NULL,
             amount REAL NOT NULL,
@@ -1180,6 +1181,9 @@ def init_branch_db_tables(db):
     add_missing_columns(db, "ledger_payments", [
         ("received_by", "TEXT"),
         ("staff_id", "TEXT"),
+    ])
+    add_missing_columns(db, "ledger_entries", [
+        ("source_purchase_id", "TEXT"),
     ])
     add_missing_columns(db, "assets", [
         ("staff", "TEXT NOT NULL DEFAULT ''"),
