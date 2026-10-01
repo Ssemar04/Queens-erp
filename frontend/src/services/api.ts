@@ -492,6 +492,14 @@ export const toggleBankTransactionReconciled = async (id: string): Promise<BankT
   return response.data;
 };
 
+export const updateBankTransaction = async (
+  id: string,
+  patch: Partial<BankTxn>,
+): Promise<BankTxn> => {
+  const response = await api.patch(`/bank/transactions/${id}`, patch);
+  return response.data;
+};
+
 export const importBankStatement = async (
   accountId: string,
   lines: Omit<StatementLine, "id" | "accountId" | "importedAt">[],

@@ -113,7 +113,13 @@ function BankPage() {
           />
         </TabsContent>
         <TabsContent value="deposits" className="mt-5">
-          <CashFlowPanel direction="deposit" accounts={store.accounts} txns={store.txns} onAdd={store.addTxn} />
+          <CashFlowPanel
+            direction="deposit"
+            accounts={store.accounts}
+            txns={store.txns}
+            onAdd={store.addTxn}
+            onUpdate={store.updateTxn}
+          />
         </TabsContent>
         <TabsContent value="withdrawals" className="mt-5">
           <CashFlowPanel direction="withdrawal" accounts={store.accounts} txns={store.txns} onAdd={store.addTxn} />

@@ -8,7 +8,7 @@ from models.serializers import (
     bank_statement_line_from_row,
     bank_transaction_from_row,
 )
-from routes.guards import require_current_user
+from routes.guards import require_current_user, require_manager_user
 from services import bank_service
 
 
@@ -125,6 +125,36 @@ def create_bank_transaction():
         return jsonify({"success": False, "message": "A bank transaction with that ID already exists"}), 409
 
     return jsonify(bank_transaction_from_row(row)), 201
+
+
+@bank_bp.route("/api/bank/transactions/<txn_id>", methods=["PATCH"])
+def update_bank_transaction(txn_id):
+    _, auth_error = require_manager_user()
+    if auth_error:
+        return auth_error
+
+    data = request.get_json(silent=True) or {}
+    if not data:
+        return jsonify({"success": False, "message": "No updates provided"}), 400
+
+    if not bank_service.get_transaction(txn_id):
+        return jsonify({"success": False, "message": "Transaction not found"}), 404
+
+    if data.get("accountId") and not bank_service.get_account(data["accountId"]):
+        return jsonify({"success": False, "message": "Account not found"}), 404
+
+    if data.get("amount") is not None:
+        try:
+            if float(data["amount"]) == 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "message": "Amount must be a non-zero number"}), 400
+
+    row = bank_service.update_transaction(txn_id, data)
+    if not row:
+        return jsonify({"success": False, "message": "No valid updates provided"}), 400
+
+    return jsonify(bank_transaction_from_row(row))
 
 
 @bank_bp.route("/api/bank/transactions/<txn_id>/reconciled", methods=["PATCH"])

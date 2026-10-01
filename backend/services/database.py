@@ -858,6 +858,7 @@ def init_branch_db_tables(db):
             description TEXT NOT NULL DEFAULT '',
             amount REAL NOT NULL,
             party TEXT NOT NULL DEFAULT '',
+            customer_id TEXT,
             mobile_provider TEXT,
             reconciled INTEGER NOT NULL DEFAULT 0,
             attachment TEXT,
@@ -1172,7 +1173,10 @@ def init_branch_db_tables(db):
         ("ppda_compliance", "TEXT"),
         ("is_lpo_account", "INTEGER DEFAULT 0"),
     ])
-    add_missing_columns(db, "bank_transactions", [("performed_by", "TEXT NOT NULL DEFAULT ''")])
+    add_missing_columns(db, "bank_transactions", [
+        ("performed_by", "TEXT NOT NULL DEFAULT ''"),
+        ("customer_id", "TEXT"),
+    ])
     add_missing_columns(db, "ledger_payments", [
         ("received_by", "TEXT"),
         ("staff_id", "TEXT"),

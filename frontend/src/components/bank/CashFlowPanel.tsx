@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Banknote, FileText, Smartphone, Search, Paperclip, Upload, Eye, X, Check, User } from "lucide-react";
+import { Plus, Banknote, FileText, Smartphone, Search, Paperclip, Upload, Eye, X, Check, User, Pencil, CalendarDays, Building2, CheckCircle2, StickyNote, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,7 @@ import { useCustomers, type Customer } from "@/components/customers/customers-st
 import { useEmployees } from "@/components/employees/employees-store";
 import { useAuth } from "@/hooks/useAuth";
 import { useBranch } from "@/contexts/BranchContext";
+import { useRole } from "@/hooks/useRole";
 
 
 type Direction = "deposit" | "withdrawal";
@@ -47,6 +48,7 @@ interface Props {
   accounts: BankAccount[];
   txns: BankTxn[];
   onAdd: (t: Omit<BankTxn, "id" | "createdAt" | "reconciled">) => Promise<unknown>;
+  onUpdate?: (id: string, patch: Partial<BankTxn>) => Promise<unknown>;
 }
 
 const DEPOSIT_TYPES: { value: DepositType; label: string; icon: typeof Banknote }[] = [
@@ -62,11 +64,16 @@ const WITHDRAWAL_TYPES: { value: WithdrawalType; label: string; icon: typeof Ban
   { value: "mobile_money", label: "Mobile money", icon: Smartphone },
 ];
 
-export function CashFlowPanel({ direction, accounts, txns, onAdd }: Props) {
+export function CashFlowPanel({ direction, accounts, txns, onAdd, onUpdate }: Props) {
   const [open, setOpen] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<ReceiptAttachment | null>(null);
+  const [previewTxn, setPreviewTxn] = useState<BankTxn | null>(null);
+  const [editingTxn, setEditingTxn] = useState<BankTxn | null>(null);
   const [q, setQ] = useState("");
   const isDeposit = direction === "deposit";
+  const { isAdmin, isManager } = useRole();
+  const canEdit = isDeposit && Boolean(onUpdate) && (isAdmin || isManager);
+  const columnCount = 9 + (canEdit ? 1 : 0);
 
   const filtered = useMemo(() => {
     const rel = txns.filter((t) => (isDeposit ? t.amount > 0 : t.amount < 0));
@@ -119,13 +126,22 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd }: Props) {
               <TableHead>Account</TableHead>
               <TableHead>Receipt</TableHead>
               <TableHead className="text-right">Amount</TableHead>
+              {canEdit && (
+                <TableHead className="w-12 text-right">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((t) => {
               const acc = accounts.find((a) => a.id === t.accountId);
               return (
-                <TableRow key={t.id}>
+                <TableRow
+                  key={t.id}
+                  onClick={isDeposit ? () => setPreviewTxn(t) : undefined}
+                  className={cn(isDeposit && "cursor-pointer transition-colors hover:bg-muted/40")}
+                >
                   <TableCell className="text-sm text-muted-foreground">{t.date}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="gap-1 capitalize">
@@ -152,7 +168,10 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd }: Props) {
                     {t.attachment ? (
                       <button
                         type="button"
-                        onClick={() => setPreviewAttachment(t.attachment ?? null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewAttachment(t.attachment ?? null);
+                        }}
                         className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-primary hover:bg-muted"
                         title={t.attachment.name}
                       >
@@ -166,11 +185,27 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd }: Props) {
                   <TableCell className={cn("text-right font-mono text-sm font-semibold", isDeposit ? "text-emerald-600" : "text-destructive")}>
                     {fmt(t.amount, acc?.currency)}
                   </TableCell>
+                  {canEdit && (
+                    <TableCell className="text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTxn(t);
+                        }}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-white text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                        title="Edit deposit"
+                        aria-label="Edit deposit"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">No {isDeposit ? "deposits" : "withdrawals"} yet.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={columnCount} className="py-12 text-center text-sm text-muted-foreground">No {isDeposit ? "deposits" : "withdrawals"} yet.</TableCell></TableRow>
             )}
           </TableBody>
 
@@ -178,19 +213,53 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd }: Props) {
       </div>
 
       <CashFlowSheet
-        open={open}
-        onOpenChange={setOpen}
-        direction={direction}
-        accounts={accounts}
-        onSubmit={async (t) => {
-          try {
-            await onAdd(t);
-            toast.success(`${isDeposit ? "Deposit" : "Withdrawal"} recorded`);
+        open={open || Boolean(editingTxn)}
+        onOpenChange={(next) => {
+          if (!next) {
             setOpen(false);
-          } catch {
-            toast.error(`Could not record ${isDeposit ? "deposit" : "withdrawal"}`);
+            setEditingTxn(null);
+          } else {
+            setOpen(true);
           }
         }}
+        direction={direction}
+        accounts={accounts}
+        initial={editingTxn}
+        onSubmit={async (t) => {
+          const editing = editingTxn;
+          try {
+            if (editing && onUpdate) {
+              await onUpdate(editing.id, t);
+              toast.success("Deposit updated");
+            } else {
+              await onAdd(t);
+              toast.success(`${isDeposit ? "Deposit" : "Withdrawal"} recorded`);
+            }
+            setOpen(false);
+            setEditingTxn(null);
+            setPreviewTxn(null);
+          } catch {
+            toast.error(
+              editing
+                ? "Could not update deposit"
+                : `Could not record ${isDeposit ? "deposit" : "withdrawal"}`,
+            );
+          }
+        }}
+      />
+      <DepositPreviewDialog
+        txn={previewTxn}
+        account={previewTxn ? accounts.find((a) => a.id === previewTxn.accountId) ?? null : null}
+        open={Boolean(previewTxn)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setPreviewTxn(null);
+        }}
+        canEdit={canEdit}
+        onEdit={(txn) => {
+          setPreviewTxn(null);
+          setEditingTxn(txn);
+        }}
+        onViewAttachment={(attachment) => setPreviewAttachment(attachment)}
       />
       <AttachmentPreviewDialog
         attachment={previewAttachment}
@@ -199,6 +268,150 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd }: Props) {
           if (!nextOpen) setPreviewAttachment(null);
         }}
       />
+    </div>
+  );
+}
+
+function DepositPreviewDialog({
+  txn: txnProp,
+  account: accountProp,
+  open,
+  onOpenChange,
+  canEdit,
+  onEdit,
+  onViewAttachment,
+}: {
+  txn: BankTxn | null;
+  account?: BankAccount | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  canEdit: boolean;
+  onEdit: (txn: BankTxn) => void;
+  onViewAttachment: (attachment: ReceiptAttachment) => void;
+}) {
+  const last = useRef<{ txn: BankTxn; account: BankAccount | null } | null>(null);
+  if (txnProp) last.current = { txn: txnProp, account: accountProp ?? null };
+  const view = txnProp ? { txn: txnProp, account: accountProp ?? null } : last.current;
+
+  if (!view) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent />
+      </Dialog>
+    );
+  }
+
+  const txn = view.txn;
+  const account = view.account;
+  const TypeIcon =
+    txn.subtype === "mobile_money" ? Smartphone : txn.subtype === "cheque" ? FileText : Banknote;
+  const typeLabel = (txn.subtype ?? "deposit").replace("_", " ");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92vh] max-w-[min(96vw,560px)] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+              <Banknote className="h-4 w-4" />
+            </span>
+            Deposit details
+          </DialogTitle>
+          <DialogDescription className="font-mono text-xs">{txn.reference}</DialogDescription>
+        </DialogHeader>
+
+        <div className="rounded-xl border border-border bg-gradient-to-br from-emerald-50 to-white p-4">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Amount</p>
+          <p className="mt-1 font-mono text-3xl font-bold text-emerald-600">
+            {fmt(txn.amount, account?.currency)}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="gap-1 capitalize">
+              <TypeIcon className="h-3 w-3" />
+              {typeLabel}
+              {txn.mobileProvider ? ` · ${txn.mobileProvider}` : ""}
+            </Badge>
+            <Badge variant={txn.reconciled ? "default" : "secondary"} className="gap-1">
+              <CheckCircle2 className="h-3 w-3" />
+              {txn.reconciled ? "Reconciled" : "Unreconciled"}
+            </Badge>
+          </div>
+        </div>
+
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+          <DetailRow icon={Hash} label="Reference" value={txn.reference} mono />
+          <DetailRow icon={CalendarDays} label="Date" value={txn.date} />
+          <DetailRow icon={User} label="From (payer)" value={txn.party || "—"} />
+          <DetailRow icon={User} label="Staff" value={txn.performedBy || "—"} />
+          <DetailRow
+            icon={Building2}
+            label="Account"
+            value={account ? `${account.accountName} · ${account.bankName}` : "—"}
+          />
+          <DetailRow
+            icon={CalendarDays}
+            label="Recorded"
+            value={txn.createdAt ? new Date(txn.createdAt).toLocaleString() : "—"}
+          />
+        </dl>
+
+        {txn.description && (
+          <div className="space-y-1.5">
+            <p className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+              <StickyNote className="h-3.5 w-3.5" /> Description
+            </p>
+            <p className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-foreground">
+              {txn.description}
+            </p>
+          </div>
+        )}
+
+        {txn.attachment && (
+          <button
+            type="button"
+            onClick={() => onViewAttachment(txn.attachment as ReceiptAttachment)}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-primary transition-colors hover:bg-muted"
+          >
+            <Paperclip className="h-4 w-4" />
+            <span className="max-w-[280px] truncate">{txn.attachment.name}</span>
+            <Eye className="ml-auto h-3.5 w-3.5" />
+          </button>
+        )}
+
+        <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          {canEdit && (
+            <Button size="sm" onClick={() => onEdit(txn)}>
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              Edit deposit
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailRow({
+  icon: Icon,
+  label,
+  value,
+  mono,
+}: {
+  icon: typeof Hash;
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="space-y-0.5">
+      <dt className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </dt>
+      <dd className={cn("text-sm text-foreground", mono && "font-mono text-xs")}>{value}</dd>
     </div>
   );
 }
@@ -287,15 +500,17 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function CashFlowSheet({
-  open, onOpenChange, direction, accounts, onSubmit,
+  open, onOpenChange, direction, accounts, onSubmit, initial,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   direction: Direction;
   accounts: BankAccount[];
   onSubmit: (t: Omit<BankTxn, "id" | "createdAt" | "reconciled">) => Promise<void>;
+  initial?: BankTxn | null;
 }) {
   const isDeposit = direction === "deposit";
+  const isEditing = Boolean(initial);
   const types = isDeposit ? DEPOSIT_TYPES : WITHDRAWAL_TYPES;
   const { customers, loading: customersLoading } = useCustomers();
   const { employees } = useEmployees();
@@ -367,6 +582,22 @@ function CashFlowSheet({
 
   useEffect(() => {
     if (!open) return;
+    if (initial) {
+      setAccountId(initial.accountId);
+      setSubtype(initial.subtype ?? types[0].value);
+      setReference(initial.reference ?? "");
+      setParty(initial.party ?? "");
+      setPartyFocused(false);
+      setSelectedCustomerId(initial.customerId ?? null);
+      setDescription(initial.description ?? "");
+      setAmount(String(Math.abs(initial.amount ?? 0)));
+      setDate(initial.date ?? new Date().toISOString().slice(0, 10));
+      setProvider((initial.mobileProvider as MobileProvider) ?? MOBILE_PROVIDERS[0]);
+      setAttachment(initial.attachment ?? null);
+      setPreviewOpen(false);
+      setStaff(initial.performedBy || authenticatedUserName || activeStaff[0]?.name || "");
+      return;
+    }
     setAccountId(accounts[0]?.id ?? "");
     setSubtype(types[0].value);
     setReference("");
@@ -380,7 +611,7 @@ function CashFlowSheet({
     setAttachment(null);
     setPreviewOpen(false);
     setStaff(authenticatedUserName || activeStaff[0]?.name || "");
-  }, [accounts, open, types, authenticatedUserName, activeStaff]);
+  }, [accounts, open, types, authenticatedUserName, activeStaff, initial]);
 
   function selectCustomerProfile(profile: Customer) {
     setSelectedCustomerId(profile.id);
@@ -423,9 +654,15 @@ function CashFlowSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-[480px] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>New {isDeposit ? "deposit" : "withdrawal"}</SheetTitle>
+          <SheetTitle>
+            {isEditing ? "Edit" : "New"} {isDeposit ? "deposit" : "withdrawal"}
+          </SheetTitle>
           <SheetDescription>
-            {isDeposit ? "Money coming into a bank account." : "Money leaving a bank account."}
+            {isEditing
+              ? "Update this entry. Account balance and customer records adjust automatically."
+              : isDeposit
+                ? "Money coming into a bank account."
+                : "Money leaving a bank account."}
           </SheetDescription>
         </SheetHeader>
 
@@ -629,7 +866,7 @@ function CashFlowSheet({
               setAttachment(null);
             }}
           >
-            Record
+            {isEditing ? "Save changes" : "Record"}
           </Button>
         </SheetFooter>
       </SheetContent>

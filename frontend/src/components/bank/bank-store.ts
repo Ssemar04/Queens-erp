@@ -9,6 +9,7 @@ import {
   importBankStatement,
   toggleBankTransactionReconciled,
   updateBankAccount,
+  updateBankTransaction,
 } from "@/services/api";
 
 export type AccountStatus = "active" | "inactive";
@@ -181,6 +182,29 @@ export function useBankStore() {
     return txn;
   }, [assertCanUseBackend]);
 
+  const updateTxn = useCallback(
+    async (id: string, patch: Partial<BankTxn>) => {
+      assertCanUseBackend();
+      const previous = txns.find((t) => t.id === id);
+      const txn = await updateBankTransaction(id, patch);
+      setTxns((current) => current.map((t) => (t.id === id ? txn : t)));
+      if (previous) {
+        setAccounts((current) =>
+          current.map((a) => {
+            let balance = a.currentBalance;
+            if (a.id === previous.accountId) balance -= previous.amount;
+            if (a.id === txn.accountId) balance += txn.amount;
+            return a.id === previous.accountId || a.id === txn.accountId
+              ? { ...a, currentBalance: balance }
+              : a;
+          }),
+        );
+      }
+      return txn;
+    },
+    [assertCanUseBackend, txns],
+  );
+
   const importStatement = useCallback(
     async (accountId: string, lines: Omit<StatementLine, "id" | "accountId" | "importedAt">[]) => {
       assertCanUseBackend();
@@ -200,6 +224,7 @@ export function useBankStore() {
     updateAccount,
     removeAccount,
     addTxn,
+    updateTxn,
     toggleReconciled,
     importStatement,
   };

@@ -426,6 +426,7 @@ def bank_transaction_from_row(row):
         "description": row["description"],
         "amount": row["amount"],
         "party": row["party"],
+        "customerId": get("customer_id"),
         "mobileProvider": row["mobile_provider"],
         "reconciled": bool(row["reconciled"]),
         "attachment": attachment if isinstance(attachment, dict) else None,
