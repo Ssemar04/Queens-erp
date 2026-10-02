@@ -1207,6 +1207,7 @@ def init_branch_db_tables(db):
     add_missing_columns(db, "bank_transactions", [
         ("performed_by", "TEXT NOT NULL DEFAULT ''"),
         ("customer_id", "TEXT"),
+        ("comments", "TEXT"),
     ])
     add_missing_columns(db, "ledger_payments", [
         ("received_by", "TEXT"),

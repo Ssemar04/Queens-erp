@@ -416,6 +416,16 @@ def bank_transaction_from_row(row):
         except (KeyError, IndexError):
             return default
 
+    comments = []
+    raw_comments = get("comments")
+    if raw_comments:
+        try:
+            parsed = json.loads(raw_comments)
+            if isinstance(parsed, list):
+                comments = parsed
+        except (json.JSONDecodeError, TypeError):
+            comments = []
+
     return {
         "id": row["id"],
         "accountId": row["account_id"],
@@ -431,6 +441,7 @@ def bank_transaction_from_row(row):
         "reconciled": bool(row["reconciled"]),
         "attachment": attachment if isinstance(attachment, dict) else None,
         "performedBy": get("performed_by", "") or "",
+        "comments": comments,
         "createdAt": row["created_at"],
     }
 

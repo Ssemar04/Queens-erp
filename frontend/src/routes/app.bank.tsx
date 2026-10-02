@@ -122,7 +122,13 @@ function BankPage() {
           />
         </TabsContent>
         <TabsContent value="withdrawals" className="mt-5">
-          <CashFlowPanel direction="withdrawal" accounts={store.accounts} txns={store.txns} onAdd={store.addTxn} />
+          <CashFlowPanel
+            direction="withdrawal"
+            accounts={store.accounts}
+            txns={store.txns}
+            onAdd={store.addTxn}
+            onUpdate={store.updateTxn}
+          />
         </TabsContent>
         <TabsContent value="reconcile" className="mt-5">
           <ReconciliationPanel

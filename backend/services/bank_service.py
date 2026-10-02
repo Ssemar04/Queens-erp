@@ -155,15 +155,16 @@ def create_transaction(data):
     attachment = data.get("attachment")
     customer_id = data.get("customerId")
     party = data.get("party") or ""
+    comments = data.get("comments")
 
     db.execute(
         """
         INSERT INTO bank_transactions (
             id, account_id, date, txn_type, subtype, reference, description, amount,
             party, customer_id, mobile_provider, reconciled, attachment, performed_by,
-            created_at, updated_at
+            comments, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             data["id"],
@@ -180,6 +181,7 @@ def create_transaction(data):
             1 if data.get("reconciled") else 0,
             json.dumps(attachment) if attachment else None,
             data.get("performedBy") or "",
+            json.dumps(comments) if comments else None,
             created_at,
             data.get("updatedAt") or created_at,
         ),
@@ -309,6 +311,10 @@ def update_transaction(txn_id, data):
         attachment = data.get("attachment")
         updates.append("attachment = ?")
         params.append(json.dumps(attachment) if attachment else None)
+    if "comments" in data:
+        comments = data.get("comments")
+        updates.append("comments = ?")
+        params.append(json.dumps(comments) if comments else None)
 
     if not updates:
         return None

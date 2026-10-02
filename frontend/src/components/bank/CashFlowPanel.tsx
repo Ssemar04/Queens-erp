@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Banknote, FileText, Smartphone, Search, Paperclip, Upload, Eye, X, Check, User, Pencil, CalendarDays, Building2, CheckCircle2, StickyNote, Hash } from "lucide-react";
+import { Plus, Banknote, FileText, Smartphone, Search, Paperclip, Upload, Eye, X, Check, User, Pencil, CalendarDays, Building2, CheckCircle2, StickyNote, Hash, MessageSquare, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { BankAccount, BankTxn, DepositType, WithdrawalType, MobileProvider, ReceiptAttachment } from "./bank-store";
+import type { BankAccount, BankTxn, DepositType, WithdrawalType, MobileProvider, ReceiptAttachment, TxnComment } from "./bank-store";
 import { fmt } from "./bank-store";
 import { useCustomers, type Customer } from "@/components/customers/customers-store";
 import { useEmployees } from "@/components/employees/employees-store";
@@ -72,7 +72,7 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd, onUpdate }: Pr
   const [q, setQ] = useState("");
   const isDeposit = direction === "deposit";
   const { isAdmin, isManager } = useRole();
-  const canEdit = isDeposit && Boolean(onUpdate) && (isAdmin || isManager);
+  const canEdit = Boolean(onUpdate) && isAdmin;
   const columnCount = 9 + (canEdit ? 1 : 0);
 
   const filtered = useMemo(() => {
@@ -139,8 +139,8 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd, onUpdate }: Pr
               return (
                 <TableRow
                   key={t.id}
-                  onClick={isDeposit ? () => setPreviewTxn(t) : undefined}
-                  className={cn(isDeposit && "cursor-pointer transition-colors hover:bg-muted/40")}
+                  onClick={() => setPreviewTxn(t)}
+                  className="cursor-pointer transition-colors hover:bg-muted/40"
                 >
                   <TableCell className="text-sm text-muted-foreground">{t.date}</TableCell>
                   <TableCell>
@@ -260,6 +260,7 @@ export function CashFlowPanel({ direction, accounts, txns, onAdd, onUpdate }: Pr
           setEditingTxn(txn);
         }}
         onViewAttachment={(attachment) => setPreviewAttachment(attachment)}
+        onUpdate={onUpdate}
       />
       <AttachmentPreviewDialog
         attachment={previewAttachment}
@@ -280,6 +281,7 @@ function DepositPreviewDialog({
   canEdit,
   onEdit,
   onViewAttachment,
+  onUpdate,
 }: {
   txn: BankTxn | null;
   account?: BankAccount | null;
@@ -288,7 +290,12 @@ function DepositPreviewDialog({
   canEdit: boolean;
   onEdit: (txn: BankTxn) => void;
   onViewAttachment: (attachment: ReceiptAttachment) => void;
+  onUpdate?: (id: string, patch: Partial<BankTxn>) => Promise<unknown>;
 }) {
+  const { user } = useAuth();
+  const { isAdmin, isManager } = useRole();
+  const [commentText, setCommentText] = useState("");
+  const [isPosting, setIsPosting] = useState(false);
   const last = useRef<{ txn: BankTxn; account: BankAccount | null } | null>(null);
   if (txnProp) last.current = { txn: txnProp, account: accountProp ?? null };
   const view = txnProp ? { txn: txnProp, account: accountProp ?? null } : last.current;
@@ -303,26 +310,70 @@ function DepositPreviewDialog({
 
   const txn = view.txn;
   const account = view.account;
+  const isDeposit = txn.amount >= 0;
   const TypeIcon =
     txn.subtype === "mobile_money" ? Smartphone : txn.subtype === "cheque" ? FileText : Banknote;
-  const typeLabel = (txn.subtype ?? "deposit").replace("_", " ");
+  const typeLabel = (txn.subtype ?? (isDeposit ? "deposit" : "withdrawal")).replace("_", " ");
+
+  const authorName =
+    (user?.user_metadata?.full_name as string) || (user?.email?.split("@")[0]) || "User";
+  const userRoleLabel = isAdmin ? "Admin" : isManager ? "Manager" : "Staff";
+
+  async function handleAddComment() {
+    if (!commentText.trim() || !onUpdate) return;
+    setIsPosting(true);
+    try {
+      const newComment: TxnComment = {
+        id: crypto.randomUUID(),
+        author: authorName,
+        role: userRoleLabel,
+        text: commentText.trim(),
+        createdAt: new Date().toISOString(),
+      };
+      const existing = txn.comments || [];
+      await onUpdate(txn.id, { comments: [...existing, newComment] });
+      setCommentText("");
+      toast.success("Comment added to transaction");
+    } catch {
+      toast.error("Could not add comment");
+    } finally {
+      setIsPosting(false);
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-[min(96vw,560px)] overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-[min(96vw,580px)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+            <span
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-lg",
+                isDeposit ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600",
+              )}
+            >
               <Banknote className="h-4 w-4" />
             </span>
-            Deposit details
+            {isDeposit ? "Deposit details" : "Withdrawal details"}
           </DialogTitle>
           <DialogDescription className="font-mono text-xs">{txn.reference}</DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-xl border border-border bg-gradient-to-br from-emerald-50 to-white p-4">
+        <div
+          className={cn(
+            "rounded-xl border border-border p-4",
+            isDeposit
+              ? "bg-gradient-to-br from-emerald-50 to-white"
+              : "bg-gradient-to-br from-rose-50 to-white",
+          )}
+        >
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Amount</p>
-          <p className="mt-1 font-mono text-3xl font-bold text-emerald-600">
+          <p
+            className={cn(
+              "mt-1 font-mono text-3xl font-bold",
+              isDeposit ? "text-emerald-600" : "text-rose-600",
+            )}
+          >
             {fmt(txn.amount, account?.currency)}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -341,7 +392,7 @@ function DepositPreviewDialog({
         <dl className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
           <DetailRow icon={Hash} label="Reference" value={txn.reference} mono />
           <DetailRow icon={CalendarDays} label="Date" value={txn.date} />
-          <DetailRow icon={User} label="From (payer)" value={txn.party || "—"} />
+          <DetailRow icon={User} label={isDeposit ? "From (payer)" : "To (payee)"} value={txn.party || "—"} />
           <DetailRow icon={User} label="Staff" value={txn.performedBy || "—"} />
           <DetailRow
             icon={Building2}
@@ -367,16 +418,87 @@ function DepositPreviewDialog({
         )}
 
         {txn.attachment && (
-          <button
-            type="button"
-            onClick={() => onViewAttachment(txn.attachment as ReceiptAttachment)}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-primary transition-colors hover:bg-muted"
-          >
-            <Paperclip className="h-4 w-4" />
-            <span className="max-w-[280px] truncate">{txn.attachment.name}</span>
-            <Eye className="ml-auto h-3.5 w-3.5" />
-          </button>
+          <div className="space-y-1.5">
+            <p className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+              <Paperclip className="h-3.5 w-3.5" /> Receipt attachment
+            </p>
+            <div>
+              <button
+                type="button"
+                onClick={() => onViewAttachment(txn.attachment as ReceiptAttachment)}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-primary transition-colors hover:bg-muted"
+              >
+                <Paperclip className="h-4 w-4" />
+                <span className="max-w-[280px] truncate">{txn.attachment.name}</span>
+                <Eye className="ml-auto h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
         )}
+
+        <div className="space-y-3 border-t border-border pt-4">
+          <div className="flex items-center justify-between">
+            <h4 className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <MessageSquare className="h-3.5 w-3.5 text-primary" /> Comments & Notes
+              {txn.comments && txn.comments.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[10px]">
+                  {txn.comments.length}
+                </Badge>
+              )}
+            </h4>
+          </div>
+
+          {txn.comments && txn.comments.length > 0 ? (
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {txn.comments.map((c) => (
+                <div key={c.id} className="rounded-lg border border-border bg-muted/20 p-2.5 text-xs">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+                    <span className="font-medium text-foreground flex items-center gap-1">
+                      <User className="h-3 w-3 text-primary" />
+                      {c.author}
+                      <Badge variant="outline" className="text-[9px] py-0 px-1 font-normal uppercase">
+                        {c.role}
+                      </Badge>
+                    </span>
+                    <span>{new Date(c.createdAt).toLocaleString()}</span>
+                  </div>
+                  <p className="text-foreground whitespace-pre-wrap">{c.text}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">No comments yet. Managers can add notes or edit requests for the Admin.</p>
+          )}
+
+          {onUpdate && (
+            <div className="space-y-2 pt-1">
+              <Textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder={isManager && !isAdmin ? "Add a comment or edit request for Admin review…" : "Add a note or comment on this transaction…"}
+                rows={2}
+                className="bg-white text-xs"
+              />
+              <div className="flex items-center justify-between">
+                {!canEdit && isManager && (
+                  <p className="text-[11px] text-amber-600 font-medium">
+                    Only Admin can edit transaction details.
+                  </p>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!commentText.trim() || isPosting}
+                  onClick={handleAddComment}
+                  className="ml-auto gap-1.5 text-xs"
+                >
+                  <Send className="h-3 w-3" />
+                  Post Comment
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
@@ -385,7 +507,7 @@ function DepositPreviewDialog({
           {canEdit && (
             <Button size="sm" onClick={() => onEdit(txn)}>
               <Pencil className="mr-1.5 h-3.5 w-3.5" />
-              Edit deposit
+              Edit {isDeposit ? "deposit" : "withdrawal"}
             </Button>
           )}
         </div>
@@ -632,7 +754,7 @@ function CashFlowSheet({
     }
   }
 
-  const valid = accountId && reference && party && parseFloat(amount) > 0 && staff.trim().length > 0;
+  const valid = accountId && reference && party && parseFloat(amount) > 0 && staff.trim().length > 0 && Boolean(attachment);
 
   function handleFile(file: File | undefined) {
     if (!file) return;
@@ -808,7 +930,7 @@ function CashFlowSheet({
             )}
           </Field>
 
-          <Field label="Receipt (image or PDF)">
+          <Field label="Receipt (image or PDF) *">
             <input
               ref={fileRef}
               type="file"
@@ -839,6 +961,11 @@ function CashFlowSheet({
                 </div>
               )}
             </div>
+            {!attachment && (
+              <p className="text-[11px] font-medium text-destructive mt-1">
+                A receipt attachment (image or PDF) is mandatory to complete this {isDeposit ? "deposit" : "withdrawal"}.
+              </p>
+            )}
           </Field>
         </div>
 

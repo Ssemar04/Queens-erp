@@ -8,7 +8,7 @@ from models.serializers import (
     bank_statement_line_from_row,
     bank_transaction_from_row,
 )
-from routes.guards import require_current_user, require_manager_user
+from routes.guards import require_admin_user, require_current_user, require_manager_user
 from services import bank_service
 
 
@@ -113,6 +113,9 @@ def create_bank_transaction():
     if missing:
         return missing_response(missing)
 
+    if not data.get("attachment"):
+        return jsonify({"success": False, "message": "A receipt attachment (image or PDF) is required"}), 400
+
     if data["type"] not in bank_service.VALID_TXN_TYPES:
         return jsonify({"success": False, "message": "Invalid transaction type"}), 400
 
@@ -129,19 +132,27 @@ def create_bank_transaction():
 
 @bank_bp.route("/api/bank/transactions/<txn_id>", methods=["PATCH"])
 def update_bank_transaction(txn_id):
-    _, auth_error = require_manager_user()
-    if auth_error:
-        return auth_error
-
     data = request.get_json(silent=True) or {}
     if not data:
         return jsonify({"success": False, "message": "No updates provided"}), 400
+
+    non_comment_keys = [k for k in data.keys() if k != "comments"]
+    if non_comment_keys:
+        _, auth_error = require_admin_user()
+    else:
+        _, auth_error = require_manager_user()
+
+    if auth_error:
+        return auth_error
 
     if not bank_service.get_transaction(txn_id):
         return jsonify({"success": False, "message": "Transaction not found"}), 404
 
     if data.get("accountId") and not bank_service.get_account(data["accountId"]):
         return jsonify({"success": False, "message": "Account not found"}), 404
+
+    if "attachment" in data and not data.get("attachment"):
+        return jsonify({"success": False, "message": "A receipt attachment (image or PDF) is required"}), 400
 
     if data.get("amount") is not None:
         try:

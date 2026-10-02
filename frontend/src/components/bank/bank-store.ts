@@ -41,6 +41,14 @@ export interface ReceiptAttachment {
   dataUrl: string;
 }
 
+export interface TxnComment {
+  id: string;
+  author: string;
+  role: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface BankTxn {
   id: string;
   accountId: string;
@@ -56,6 +64,7 @@ export interface BankTxn {
   reconciled: boolean;
   attachment?: ReceiptAttachment | null;
   performedBy?: string;
+  comments?: TxnComment[];
   createdAt: string;
 }
 
