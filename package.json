@@ -7,6 +7,6 @@
     "typecheck": "pnpm --dir frontend run typecheck"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   }
 }

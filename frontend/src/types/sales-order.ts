@@ -163,8 +163,9 @@ export function formatAssetSpec(spec?: AssetCategorySpec | null | undefined): st
       return `${spec.widthM} × ${spec.heightM} m = ${(spec.widthM * spec.heightM).toFixed(2)} m²`;
     case "digital_printer":
       return `${spec.pages} pages`;
-    case "fargo":
+    case "fargo": {
       const side = spec.sideMode === "double" ? "Double" : "Single";
       return `${side} side${spec.laminated ? ", Laminated" : ""}`;
+    }
   }
 }

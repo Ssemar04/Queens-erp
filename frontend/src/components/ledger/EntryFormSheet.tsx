@@ -85,7 +85,7 @@ export function EntryFormSheet({ open, onOpenChange, kind, nextRef, onCreate }: 
       const found = suppliers.find((s) => s.id === val);
       if (found) {
         setPartyName(found.name);
-        setPartyRef(found.code || found.id);
+        setPartyRef(found.code || found.contactName || found.id);
       }
     }
   };
@@ -160,7 +160,7 @@ export function EntryFormSheet({ open, onOpenChange, kind, nextRef, onCreate }: 
                     ))
                   : suppliers.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name} ({s.code || s.category || "Supplier"})
+                        {s.name} ({s.code || s.category || s.contactName || "Supplier"})
                       </SelectItem>
                     ))}
               </SelectContent>

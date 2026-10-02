@@ -121,6 +121,8 @@ export type Location = Branch;
 export interface Supplier {
   id: string;
   name: string;
+  code?: string;
+  category?: string;
   contactName: string;
   email: string;
   phone: string;
@@ -148,9 +150,10 @@ export function formatAssetSaleSpec(spec?: AssetSaleCategorySpec | null | undefi
       return `${spec.widthM} × ${spec.heightM} m = ${(spec.widthM * spec.heightM).toFixed(2)} m²`;
     case "digital_printer":
       return `${spec.pages} pages`;
-    case "fargo":
+    case "fargo": {
       const side = spec.sideMode === "double" ? "Double" : "Single";
       return `${side} side, ${spec.laminated ? "Laminated" : "No lamination"}`;
+    }
   }
 }
 

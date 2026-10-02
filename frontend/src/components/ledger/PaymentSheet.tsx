@@ -90,8 +90,9 @@ function PaymentSheetBody({
           : `Recorded UGX ${num.toLocaleString()} payment to ${entry.partyName}`
       );
       onOpenChange(false);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "Could not record payment";
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = error?.response?.data?.message || error?.message || "Could not record payment";
       toast.error(msg);
     } finally {
       setSubmitting(false);

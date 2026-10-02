@@ -433,8 +433,9 @@ export const uploadOrderDocument = async (
     const targetId = orderId || "shared";
     const response = await api.post("/documents", { ...payload, salesOrderId: targetId });
     return response.data;
-  } catch (err: any) {
-    if (err?.response?.status === 404) {
+  } catch (err: unknown) {
+    const error = err as { response?: { status?: number } };
+    if (error?.response?.status === 404) {
       const response = await api.post("/documents", { ...payload, salesOrderId: orderId || "shared" });
       return response.data;
     }
