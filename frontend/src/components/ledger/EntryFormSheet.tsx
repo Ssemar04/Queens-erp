@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { getCustomers, getSuppliers, type Customer, type Supplier } from "@/services/api";
+import { getCustomers, getSuppliers, type Customer } from "@/services/api";
+import type { Supplier } from "@/types/inventory";
 import { type LedgerEntry, type LedgerKind } from "./ledger-store";
 
 interface Props {

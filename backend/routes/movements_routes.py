@@ -25,6 +25,21 @@ def validate_movement_payload(data):
     if data["type"] not in movements_service.VALID_MOVEMENT_TYPES:
         return f"Invalid movement type. Allowed: {', '.join(sorted(movements_service.VALID_MOVEMENT_TYPES))}"
 
+    sale = data.get("sale")
+    if isinstance(sale, dict):
+        try:
+            balance = float(sale.get("balance", 0) or 0)
+        except (ValueError, TypeError):
+            balance = 0.0
+
+        if balance > 0:
+            cust_name = str(sale.get("customer") or "").strip()
+            phone = str(sale.get("telephone") or "").strip()
+            if not cust_name or cust_name.lower() == "walk-in":
+                return "Customer name is required for sales with a balance greater than 0"
+            if not phone:
+                return "Customer telephone number is required for sales with a balance greater than 0"
+
     return None
 
 

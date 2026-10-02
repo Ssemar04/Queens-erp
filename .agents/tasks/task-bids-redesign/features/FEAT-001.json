@@ -1,0 +1,40 @@
+{
+  "id": "FEAT-001",
+  "type": "refactor",
+  "description": "Tab system restructure and PPDA tab + form field removal in app.orders.tsx. Renames tab keys (lpo→orders, orders→bids), removes the ppda tab entirely (including its 229-line inline JSX block and the PpdaComplianceWorkspace component definition at lines 5554–5740), strips all 24 PPDA useState variables and 3 PPDA JSX sections from OrderFormSheet, and cleans up dead imports. Independent of FEAT-002.",
+  "status": "pending",
+  "steps": [
+    "Step 1 — activeTab useState type (line 306): change 'useState<\"documents\" | \"lpo\" | \"orders\" | \"ppda\">' to 'useState<\"documents\" | \"bids\" | \"orders\">'.",
+    "Step 2 — useEffect that loads documents (line 367): change 'activeTab === \"lpo\"' to 'activeTab === \"orders\"' inside the condition '(activeTab === \"documents\" || activeTab === \"lpo\")'.",
+    "Step 3 — sections array (line 392): change '[\"hero\", \"kpis\", \"tabs\", \"documents\", \"lpo\", \"orders\"]' to '[\"hero\", \"kpis\", \"tabs\", \"documents\", \"bids\", \"orders\"]'.",
+    "Step 4 — Add lpoOrders memo just after branchScopedEmployees memo (~line 467): 'const lpoOrders = useMemo(() => orders.filter((o) => o.isLpoAccount === true), [orders]);'.",
+    "Step 5 — KPI card onClick handlers (lines 654–656 and 664): remove the onClick prop from both 'Stages In Progress' and 'Compliance Gaps' KpiCard components. The cards remain rendered but no longer navigate to the removed ppda tab.",
+    "Step 6 — Tab bar render array (line 675): replace the entire tab-bar map block — change array from ['documents','lpo','orders','ppda'] to ['documents','bids','orders'] and update label logic to: documents→same, bids→`Bids (${filtered.length})`, orders→`Orders (${lpoOrders.length})`.",
+    "Step 7 — activeTab === 'lpo' panel (line 716): change to activeTab === 'orders'.",
+    "Step 8 — PPDA tab block removal (lines 728–956): delete the entire '{activeTab === \"ppda\" && ( <div ...> ... <PpdaComplianceWorkspace orders={orders} /> </div> )}' block, lines 728 through 956 inclusive.",
+    "Step 9 — activeTab === 'orders' panel (line 957 after deletions, ~728 after): change to activeTab === 'bids'.",
+    "Step 10 — Remove PpdaComplianceWorkspace function definition and its helpers (workingDaysBetween + UGANDA_2026_PUBLIC_HOLIDAYS constant): delete from the UGANDA_2026_PUBLIC_HOLIDAYS const declaration down to the closing brace of PpdaComplianceWorkspace (~lines 5490–5740 in original). Use grep to confirm exact start line of UGANDA_2026_PUBLIC_HOLIDAYS before deleting.",
+    "Step 11 — OrderFormSheet: delete all 24 ppda* useState declarations (lines ~3512–3544): ppdaProcurementMethod, ppdaIsLocal, ppdaIsMsme, ppdaDomesticPct, ppdaBidSecurity, ppdaBidSecurityAmt, ppdaBidSecurityValid, ppdaBidSecurityIssuer, ppdaUraTcc, ppdaNssf, ppdaPpdaCert, ppdaUrsb, ppdaAudited, ppdaBidSecStatus, ppdaPrn, ppdaDecl, ppdaEvalCmte, ppdaContractsCmte, ppdaStandstillEnd, ppdaBidOpenedAt, ppdaTechEvalAt, ppdaFinEvalAt, ppdaAwardedAt, ppdaContractSignedAt.",
+    "Step 12 — OrderFormSheet useEffect reset block: delete the 24 ppda* reset calls (setPpdaProcurementMethod through setPpdaContractSignedAt).",
+    "Step 13 — OrderFormSheet submit() function: delete the mergedCompliance construction block (domesticPctNum, isWorks, schedule3Eligible, prefMargin, mergedCompliance object) and remove 'ppdaCompliance: mergedCompliance' from the onCreate({...}) call.",
+    "Step 14 — OrderFormSheet JSX: delete the 3 PPDA <motion.div> sections: (a) 'PPDA · Classification & Preference (Schedule 3 / 4)', (b) 'PPDA · 8-Point Statutory Compliance Status', (c) 'PPDA · Evaluation & Award Attribution'. These appear between the cart section and the delivery date / handled-by grid.",
+    "Step 15 — Import cleanup: remove from lucide-react imports: TrendingDown, DollarSign, Square, Trophy, FileCheck. Remove from types/sales-order.ts import: ProcurementMethod, PpdaComplianceDetails. Verify ComplianceStatus is still needed (yes — used in PpdaPreferenceBadge reading order.ppdaCompliance fields)."
+  ],
+  "acceptance_criteria": [
+    "Running 'cd d:\\House\\qterp\\frontend && npx tsc --noEmit' produces zero errors.",
+    "The string '\"documents\", \"bids\", \"orders\"' appears as the tab array literal in the file.",
+    "The string 'activeTab === \"ppda\"' does not appear anywhere in the file.",
+    "The string 'PpdaComplianceWorkspace' does not appear anywhere in the file.",
+    "The string 'ppdaProcurementMethod' does not appear anywhere in the file.",
+    "The string 'mergedCompliance' does not appear anywhere in the file.",
+    "The activeTab useState type is '\"documents\" | \"bids\" | \"orders\"'."
+  ],
+  "verification": [
+    "cd d:\\House\\qterp\\frontend && npx tsc --noEmit",
+    "In the modified file, search for 'activeTab === \"ppda\"' — should return zero matches.",
+    "In the modified file, search for 'PpdaComplianceWorkspace' — should return zero matches.",
+    "In the modified file, search for 'ppdaProcurementMethod' — should return zero matches."
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

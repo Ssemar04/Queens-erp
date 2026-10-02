@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
@@ -9,10 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import {
   Mail, Phone, MapPin, Building2, CreditCard, Crown, TrendingUp, AlertTriangle,
-  MessageSquare, PhoneCall, Calendar, Sparkles, Edit, Trash2, Plus, Star,
+  MessageSquare, PhoneCall, Calendar, Sparkles, Edit, Trash2, Plus, Star, ShoppingBag, Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Customer, CustomerInteraction } from "./customers-store";
+import type { StockMovement } from "@/types/inventory";
 
 const TIER_META: Record<Customer["tier"], { cls: string; label: string }> = {
   bronze: { cls: "bg-amber-700/15 text-amber-700", label: "Bronze" },
@@ -27,6 +28,7 @@ const INTERACTION_ICON = {
 
 interface CustomerDetailSheetProps {
   customer: Customer | null;
+  movements?: StockMovement[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onEdit: () => void;
@@ -41,6 +43,7 @@ export function CustomerDetailSheet(props: CustomerDetailSheetProps) {
 
 function CustomerDetailSheetBody({
   customer,
+  movements = [],
   open,
   onOpenChange,
   onEdit,
@@ -58,6 +61,65 @@ function CustomerDetailSheetBody({
     : null;
 
   const nextAction = computeNextAction(customer, daysSinceOrder);
+
+  const customerOrders = useMemo(() => {
+    if (!movements || movements.length === 0) return [];
+    const map = new Map<string, {
+      receiptNumber: string;
+      date: string;
+      totalAmount: number;
+      deposit: number;
+      balance: number;
+      paymentMethod: string;
+      status: string;
+      items: string[];
+    }>();
+
+    const cName = (customer.name || "").toLowerCase().trim();
+    const cRef = (customer.reference || "").toLowerCase().trim();
+    const cPhone = (customer.phone || "").replace(/\D/g, "");
+
+    for (const m of movements) {
+      const sale = m.sale;
+      if (!sale) continue;
+      const sCustId = sale.customerId;
+      const sName = (sale.customer || "").toLowerCase().trim();
+      const sPhone = (sale.telephone || "").replace(/\D/g, "");
+
+      const isMatch =
+        (sCustId && sCustId === customer.id) ||
+        (sName && (sName === cName || sName === cRef)) ||
+        (cPhone && sPhone && (sPhone.length >= 6 && (sPhone.includes(cPhone) || cPhone.includes(sPhone))));
+
+      if (!isMatch) continue;
+
+      const receiptNumber = sale.receiptNumber || m.reference || m.id;
+      const existing = map.get(receiptNumber);
+      const itemName = sale.itemName || m.notes || "Item";
+      const itemDesc = `${itemName}${m.quantity ? ` (x${Math.abs(m.quantity)})` : ""}`;
+
+      if (existing) {
+        if (!existing.items.includes(itemDesc)) {
+          existing.items.push(itemDesc);
+        }
+      } else {
+        map.set(receiptNumber, {
+          receiptNumber,
+          date: m.createdAt,
+          totalAmount: sale.totalAmount || 0,
+          deposit: sale.deposit || 0,
+          balance: sale.balance || 0,
+          paymentMethod: sale.paymentMethod || "cash",
+          status: sale.status || "paid",
+          items: [itemDesc],
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
+  }, [movements, customer]);
 
   function logNote() {
     if (!noteText.trim()) return;
@@ -124,7 +186,7 @@ function CustomerDetailSheetBody({
 
           <div className="grid grid-cols-3 gap-2">
             <Stat label="Lifetime value" value={`UGX ${(customer.lifetimeValue / 1000).toFixed(0)}K`} />
-            <Stat label="Orders" value={String(customer.totalOrders)} />
+            <Stat label="Orders" value={String(customerOrders.length || customer.totalOrders)} />
             <Stat label="Avg order" value={`UGX ${(customer.avgOrderValue / 1000).toFixed(1)}K`} />
           </div>
 
@@ -147,10 +209,12 @@ function CustomerDetailSheetBody({
             </div>
           )}
 
-          <Tabs defaultValue="overview">
+          <Tabs defaultValue="activity">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
+              <TabsTrigger value="activity">
+                Activity & Orders {customerOrders.length > 0 && `(${customerOrders.length})`}
+              </TabsTrigger>
               <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
             </TabsList>
 
@@ -167,39 +231,96 @@ function CustomerDetailSheetBody({
               )}
             </TabsContent>
 
-            <TabsContent value="activity" className="mt-4 space-y-3">
-              <div className="space-y-2">
-                <Textarea
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
-                  placeholder="Log a note, call, or follow-up…"
-                  rows={2}
-                />
-                <Button size="sm" onClick={logNote} disabled={!noteText.trim()} className="w-full">
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Log activity
-                </Button>
-              </div>
-              <div className="relative space-y-3 border-l border-border pl-4">
-                {customer.interactions.length === 0 && (
-                  <div className="py-4 text-center text-xs text-muted-foreground">No activity yet</div>
-                )}
-                {customer.interactions.map((i) => {
-                  const Icon = INTERACTION_ICON[i.type];
-                  return (
-                    <div key={i.id} className="relative">
-                      <span className="absolute -left-[1.4rem] flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <Icon className="h-3 w-3" />
-                      </span>
-                      <div className="rounded-lg bg-white border border-border p-2.5">
-                        <div className="text-sm text-foreground">{i.summary}</div>
-                        <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                          <span>{new Date(i.at).toLocaleString()}</span>
-                          {i.by && <span>· {i.by}</span>}
+            <TabsContent value="activity" className="mt-4 space-y-4">
+              {/* Customer Orders Section */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <ShoppingBag className="h-3.5 w-3.5 text-primary" /> Customer Orders & Purchases ({customerOrders.length})
+                  </span>
+                </div>
+
+                {customerOrders.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                    No orders placed by this customer yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {customerOrders.map((order) => (
+                      <div key={order.receiptNumber} className="rounded-xl border border-border bg-white p-3 text-xs space-y-1.5 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-mono font-semibold text-foreground">
+                            <Receipt className="h-3.5 w-3.5 text-primary" /> {order.receiptNumber}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "capitalize text-[10px]",
+                              order.status === "paid" && "border-emerald-300 bg-emerald-50 text-emerald-700",
+                              order.status === "partial" && "border-amber-300 bg-amber-50 text-amber-700",
+                              order.status === "pending" && "border-sky-300 bg-sky-50 text-sky-700",
+                              order.status === "void" && "border-rose-300 bg-rose-50 text-rose-700",
+                            )}
+                          >
+                            {order.status}
+                          </Badge>
+                        </div>
+                        <div className="text-muted-foreground">
+                          {order.items.join(" · ")}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between pt-1 border-t border-border/60 text-muted-foreground">
+                          <span className="font-mono">{new Date(order.date).toLocaleDateString()}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-medium text-foreground">UGX {order.totalAmount.toLocaleString()}</span>
+                            {order.balance > 0 && (
+                              <span className="font-mono text-amber-700">bal: UGX {order.balance.toLocaleString()}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Activity Logger & Timeline */}
+              <div className="pt-3 border-t border-border space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <MessageSquare className="h-3.5 w-3.5" /> Manual Notes & Interaction History
+                </div>
+                <div className="space-y-2">
+                  <Textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder="Log a note, call, or follow-up…"
+                    rows={2}
+                  />
+                  <Button size="sm" onClick={logNote} disabled={!noteText.trim()} className="w-full">
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Log activity
+                  </Button>
+                </div>
+                <div className="relative space-y-3 border-l border-border pl-4 pt-1">
+                  {customer.interactions.length === 0 && (
+                    <div className="py-2 text-center text-xs text-muted-foreground">No notes logged yet</div>
+                  )}
+                  {customer.interactions.map((i) => {
+                    const Icon = INTERACTION_ICON[i.type];
+                    return (
+                      <div key={i.id} className="relative">
+                        <span className="absolute -left-[1.4rem] flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Icon className="h-3 w-3" />
+                        </span>
+                        <div className="rounded-lg bg-white border border-border p-2.5">
+                          <div className="text-sm text-foreground">{i.summary}</div>
+                          <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <span>{new Date(i.at).toLocaleString()}</span>
+                            {i.by && <span>· {i.by}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </TabsContent>
 

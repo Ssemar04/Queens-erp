@@ -449,11 +449,7 @@ export function ageYears(a: Asset): number {
 }
 
 export function bookValue(a: Asset): number {
-  const salvage = a.salvageValue ?? 0;
-  const annual =
-    (a.purchaseCost - salvage) / Math.max(1, a.usefulLifeYears);
-  const v = a.purchaseCost - annual * ageYears(a);
-  return Math.max(salvage, v);
+  return a.purchaseCost || 0;
 }
 
 export function nextServiceDueDate(a: Asset): string | null {

@@ -89,9 +89,7 @@ export function buildIncomeStatement(i: FinanceInputs, r: DateRange): IncomeStat
     .filter((e) => inRange(e.issueDate, r) && !e.tags.includes("materials"))
     .reduce((s, e) => s + e.amount, 0);
 
-  const depreciation = depreciationForRange(i.assets, r);
-
-  const operatingIncome = grossProfit - opex - otherBills - depreciation;
+  const operatingIncome = grossProfit - opex - otherBills;
 
   // Bank charges & interest
   const charges = i.bank.txns.filter((t) => inRange(t.date, r) && t.type === "charge").reduce((s, t) => s + Math.abs(t.amount), 0);
@@ -108,7 +106,6 @@ export function buildIncomeStatement(i: FinanceInputs, r: DateRange): IncomeStat
       { label: "Gross profit", amount: grossProfit, bold: true, emphasis: grossProfit >= 0 ? "ok" : "danger" },
       { label: "Operating expenses", amount: -opex },
       { label: "Vendor bills (non-COGS)", amount: -otherBills },
-      { label: "Depreciation", amount: -depreciation },
       { label: "Operating income", amount: operatingIncome, bold: true },
       { label: "Bank charges", amount: -charges, emphasis: "muted" },
       { label: "Interest income", amount: interest, emphasis: "muted" },
@@ -116,16 +113,6 @@ export function buildIncomeStatement(i: FinanceInputs, r: DateRange): IncomeStat
     ],
     netIncome,
   };
-}
-
-function depreciationForRange(assets: Asset[], r: DateRange): number {
-  const fromMs = new Date(r.from).getTime();
-  const toMs = new Date(r.to).getTime();
-  const years = Math.max(0, (toMs - fromMs) / (365 * 86400_000));
-  return assets.reduce((s, a) => {
-    const annual = (a.purchaseCost - (a.salvageValue ?? 0)) / Math.max(1, a.usefulLifeYears);
-    return s + annual * years;
-  }, 0);
 }
 
 // ----- Balance Sheet -----
@@ -148,9 +135,8 @@ export function buildBalanceSheet(i: FinanceInputs, asOf: string): BalanceSheet 
     .filter((s) => s.status !== "void" && s.date <= asOf)
     .reduce((sum, sale) => sum + Math.max(0, sale.balance), 0);
   const ar = i.debtors.reduce((s, e) => s + Math.max(0, e.amount - e.paid), 0) + transactionReceivables;
-  // Inventory (placeholder via assets categorised "Furniture/Equipment"? skip — leave 0 for clarity)
-  // Fixed assets at book value
-  const fixed = i.assets.reduce((s, a) => s + bookValue(a), 0);
+  // Fixed assets at purchase cost
+  const fixed = i.assets.reduce((s, a) => s + (a.purchaseCost || 0), 0);
 
   const totalAssets = cash + ar + fixed;
 
@@ -166,7 +152,7 @@ export function buildBalanceSheet(i: FinanceInputs, asOf: string): BalanceSheet 
       { label: "Cash & bank balances", amount: cash, sub: true },
       { label: "Accounts receivable", amount: ar, sub: true },
       { label: "Non-current assets", amount: fixed },
-      { label: "Property, plant & equipment (NBV)", amount: fixed, sub: true },
+      { label: "Property, plant & equipment (Cost)", amount: fixed, sub: true },
     ],
     liabilities: [
       { label: "Current liabilities", amount: ap },
@@ -267,7 +253,7 @@ export function buildAssetRegister(assets: Asset[]) {
   return assets.map((a) => ({
     Tag: a.tag, Name: a.name, Category: a.category, Location: a.location || "—",
     "Purchase date": a.purchaseDate, "Purchase cost": a.purchaseCost,
-    "Book value": Math.round(bookValue(a)), Status: a.status, Condition: a.condition || "—",
+    "Asset value": Math.round(a.purchaseCost || 0), Status: a.status, Condition: a.condition || "—",
     "Last service": a.lastServiceDate ?? "—",
   }));
 }

@@ -92,10 +92,10 @@ function AssetsPage() {
               Assets hub
             </div>
             <h2 className="text-2xl font-bold leading-tight md:text-[28px]">
-              {store.assets.length.toLocaleString()} assets · {fmtKES(bookSum)} book value
+              {store.assets.length.toLocaleString()} assets · {fmtKES(totalValue)} total asset value
             </h2>
             <p className="max-w-2xl text-sm text-white/80 leading-relaxed">
-              {activeCount} active · {fmtKES(totalValue)} original cost
+              {activeCount} active
               {dueSoon.length > 0 && <> · <span className="font-semibold text-amber-200">{dueSoon.length} service due{ dueSoon.length !== 1 ? "s" : "" }</span></>}
               {inMaint > 0 && <> · {inMaint} in maintenance</>}
             </p>
@@ -115,7 +115,7 @@ function AssetsPage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi icon={Boxes} label="Assets" value={String(store.assets.length)} sub={`${store.assets.filter((a) => a.status === "active").length} active`} />
-        <Kpi icon={TrendingDown} label="Book value" value={fmtKES(bookSum)} sub={`of ${fmtKES(totalValue)} cost`} />
+        <Kpi icon={Boxes} label="Total Asset Value" value={fmtKES(totalValue)} sub={`${activeCount} active assets`} />
         <Kpi icon={Wrench} label="Service due" value={String(dueSoon.length)} sub={`${dueSoon.filter((a) => serviceHealth(a).state === "overdue").length} overdue`} tone={dueSoon.length ? "warn" : "ok"} />
         <Kpi icon={Activity} label="In maintenance" value={String(inMaint)} sub={`${((inMaint / Math.max(1, store.assets.length)) * 100).toFixed(0)}% of fleet`} />
       </div>
@@ -152,7 +152,7 @@ function AssetsPage() {
         {/* Category mix */}
         <div className="overflow-hidden rounded-xl border border-border bg-white p-4">
           <h3 className="text-sm font-semibold">Value by category</h3>
-          <p className="mb-3 text-[11px] text-muted-foreground">Book value distribution</p>
+          <p className="mb-3 text-[11px] text-muted-foreground">Asset value distribution</p>
           <div className="space-y-2">
             {byCat.map(([c, v]) => (
               <div key={c}>
@@ -203,7 +203,7 @@ function AssetsPage() {
               <TableHead>Asset</TableHead>
               <TableHead>Staff</TableHead>
               <TableHead className="text-right">Meter</TableHead>
-              <TableHead className="text-right">Book value</TableHead>
+              <TableHead className="text-right">Asset value</TableHead>
               <TableHead>Service</TableHead>
               <TableHead>Status</TableHead>
               <TableHead></TableHead>

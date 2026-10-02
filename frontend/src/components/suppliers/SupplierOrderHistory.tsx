@@ -73,7 +73,7 @@ export function SupplierOrderHistory({ purchaseOrders, supplierId }: SupplierOrd
                     </TableCell>
                     <TableCell className="font-mono text-xs">{po.items.length}</TableCell>
                     <TableCell className="font-mono text-xs">
-                      ${po.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      UGX {Math.round(po.totalCost).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {po.expectedDelivery ? format(new Date(po.expectedDelivery), "MMM d, yyyy") : "—"}

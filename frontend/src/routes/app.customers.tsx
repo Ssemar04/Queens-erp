@@ -19,6 +19,10 @@ import { CustomerFormSheet } from "@/components/customers/CustomerFormSheet";
 import { CustomerDetailSheet } from "@/components/customers/CustomerDetailSheet";
 import { LoyaltyTiersSheet } from "@/components/customers/LoyaltyTiersSheet";
 
+import { useQuery } from "@tanstack/react-query";
+import { fetchMovementTransactions } from "@/lib/movements-backend-api";
+import type { StockMovement } from "@/types/inventory";
+
 export const Route = createFileRoute("/app/customers")({
   component: CustomersPage,
   head: () => ({ meta: [{ title: "Customers - Queenstech ERP" }] }),
@@ -33,6 +37,11 @@ const TIER_DOT: Record<Customer["tier"], string> = {
 
 function CustomersPage() {
   const { customers, loading, add, update, remove, addInteraction } = useCustomers();
+  const { data: movements = [] } = useQuery<StockMovement[]>({
+    queryKey: ["backend", "movements"],
+    queryFn: () => fetchMovementTransactions(),
+    initialData: [],
+  });
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [tiersOpen, setTiersOpen] = useState(false);
@@ -272,6 +281,7 @@ function CustomersPage() {
 
       <CustomerDetailSheet
         customer={active}
+        movements={movements}
         open={!!active}
         onOpenChange={(value) => !value && setActive(null)}
         onEdit={() => {

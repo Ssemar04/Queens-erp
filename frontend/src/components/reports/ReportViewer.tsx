@@ -176,7 +176,7 @@ function build(key: ReportKey, range: DateRange, g: Granularity, i: FinanceInput
   if (key === "asset_register") {
     const arr = buildAssetRegister(i.assets);
     return {
-      rows: arr.map((r) => ({ data: { ...r, "Purchase cost": fmt(Number(r["Purchase cost"])), "Book value": fmt(Number(r["Book value"])) } as ExportRow })),
+      rows: arr.map((r) => ({ data: { ...r, "Purchase cost": fmt(Number(r["Purchase cost"])), "Asset value": fmt(Number(r["Asset value"])) } as ExportRow })),
     };
   }
 

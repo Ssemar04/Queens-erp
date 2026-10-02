@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Plus,
@@ -111,7 +111,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { createOrder, deleteOrder, deleteOrderDocument, getAllDocuments, getCustomers, getEmployees, getItems, getOrderDocuments, getOrders, updateOrder, uploadOrderDocument } from "@/services/api";
 import type { Customer } from "@/services/api";
 import type { Item } from "@/types/inventory";
-import type { AssetCategorySpec, ComplianceStatus, OrderComplaint, OrderItem, OrderStatus, PpdaComplianceDetails, ProcurementMethod, QuotationAttachment, SalesDocumentType, SalesOrder, SalesOrderDocument } from "@/types/sales-order";
+import type { AssetCategorySpec, ComplianceStatus, OrderComplaint, OrderItem, OrderStatus, QuotationAttachment, SalesDocumentType, SalesOrder, SalesOrderDocument } from "@/types/sales-order";
 import { formatAssetSpec } from "@/types/sales-order";
 import { useAssetsStore, getAssetCategoryKind, getAssetCategoryTint } from "@/components/assets/assets-store";
 import type { Employee } from "@/components/employees/employees-store";
@@ -303,7 +303,7 @@ function OrdersPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const [overdueOnly, setOverdueOnly] = useState(false);
-  const [activeTab, setActiveTab] = useState<"documents" | "lpo" | "orders" | "ppda">("documents");
+  const [activeTab, setActiveTab] = useState<"documents" | "bids" | "orders">("documents");
   const [formOpen, setFormOpen] = useState(false);
   const [lpoAccountFormOpen, setLpoAccountFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -364,7 +364,7 @@ function OrdersPage() {
   }, [loadDatabaseOrders]);
 
   useEffect(() => {
-    if (orders.length > 0 && (activeTab === "documents" || activeTab === "lpo")) {
+    if (orders.length > 0 && (activeTab === "documents" || activeTab === "orders")) {
       loadAllDocuments();
     }
   }, [activeTab, orders.length, loadAllDocuments]);
@@ -388,7 +388,7 @@ function OrdersPage() {
     });
   }, [orders, query, statusFilter, overdueOnly]);
 
-  const sections = ["hero", "kpis", "tabs", "documents", "lpo", "orders"];
+  const sections = ["hero", "kpis", "tabs", "documents", "bids", "orders"];
   const sectionIndex = (key: string) => Math.max(0, sections.indexOf(key));
 
   const dashboardStats = useMemo(() => {
@@ -476,6 +476,8 @@ function OrdersPage() {
       return e.branchId === currentBranchId || !e.branchId;
     });
   }, [employees, currentBranchId]);
+
+  const lpoOrders = useMemo(() => orders.filter((o) => o.isLpoAccount === true), [orders]);
 
   async function handleCreate(order: SalesOrder) {
     setSaving(true);
@@ -650,10 +652,6 @@ function OrdersPage() {
           icon={GripVertical}
           hint={(dashboardStats.stagesInProgressCount || 0) > 0 ? "Draft through Contracts Cmte" : "Pipeline idle"}
           tone="blue"
-          onClick={() => {
-            setActiveTab("ppda");
-            setOverdueOnly(false);
-          }}
         />
         <KpiCard
           label="Compliance Gaps"
@@ -661,7 +659,6 @@ function OrdersPage() {
           icon={(dashboardStats.complianceGapCount || 0) > 0 ? ShieldAlert : ShieldCheck}
           hint={(dashboardStats.complianceGapCount || 0) > 0 ? `${dashboardStats.complianceGapCount} pending / expired items` : "All clear — statutory checklist complete"}
           tone={(dashboardStats.complianceGapCount || 0) > 0 ? "rose" : "emerald"}
-          onClick={() => setActiveTab("ppda")}
         />
       </motion.section>
 
@@ -672,13 +669,12 @@ function OrdersPage() {
         transition={{ delay: 0.03 * sectionIndex("tabs"), duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
         className="mx-auto flex max-w-md items-center rounded-full bg-muted/40 p-1 ring-1 ring-border/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
       >
-        {(["documents", "lpo", "orders", "ppda"] as const).map((t) => {
+        {(["documents", "bids", "orders"] as const).map((t) => {
           const active = activeTab === t;
           const label =
             t === "documents" ? `Documents ${documents.length ? `(${documents.length})` : ""}`
-            : t === "lpo" ? `LPO & Awarded (${orders.length})`
-            : t === "ppda" ? `PPDA Compliance`
-            : `Bids (${filtered.length})`;
+            : t === "bids" ? `Bids (${filtered.length})`
+            : `Orders (${lpoOrders.length})`;
           return (
             <button
               key={t}
@@ -713,7 +709,7 @@ function OrdersPage() {
         />
       )}
 
-      {activeTab === "lpo" && (
+      {activeTab === "orders" && (
         <LpoWorkspace
           orders={orders}
           documents={documents}
@@ -725,236 +721,7 @@ function OrdersPage() {
         />
       )}
 
-      {activeTab === "ppda" && (
-        <div className="space-y-6">
-          {(() => {
-            const openOrders = orders.filter((o) => ["draft","advertised","submitted_egp","bid_opened","tech_eval","fin_eval","evaluated","contracts_cmte"].includes(o.status));
-            const complianceFields: Array<{ key: keyof PpdaComplianceDetails | ""; label: string; short: string }> = [
-              { key: "uraTccStatus", label: "URA TCC", short: "TCC" },
-              { key: "nssfClearanceStatus", label: "NSSF", short: "NSSF" },
-              { key: "ppdaCertStatus", label: "PPDA ROP", short: "PPDA" },
-              { key: "ursbStatus", label: "URSB", short: "URSB" },
-              { key: "auditedAccountsStatus", label: "Audited Accts", short: "AUD" },
-              { key: "bidSecurityStatus", label: "Bid Security", short: "SEC" },
-              { key: "prnProofStatus", label: "PRN Fee", short: "PRN" },
-              { key: "declarationsStatus", label: "Declarations", short: "DEC" },
-            ];
-            const chipCls = (s?: ComplianceStatus) =>
-              s === "valid" ? "bg-emerald-500/10 text-emerald-700 border-emerald-200" :
-              s === "pending" ? "bg-amber-500/10 text-amber-700 border-amber-200" :
-              s === "expired" ? "bg-rose-500/10 text-rose-700 border-rose-200" :
-              "bg-slate-100 text-slate-600 border-slate-200";
-            const chipDot = (s?: ComplianceStatus) =>
-              s === "valid" ? "bg-emerald-500" :
-              s === "pending" ? "bg-amber-500" :
-              s === "expired" ? "bg-rose-500" :
-              "bg-slate-400";
-            const nextVals: ComplianceStatus[] = ["valid", "pending", "expired", "not_required"];
-
-            const stageCols: OrderStatus[] = ["draft","advertised","submitted_egp","bid_opened","tech_eval","fin_eval","evaluated","contracts_cmte","awarded","contract_signed","complete","declined"];
-
-            return (
-              <>
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                  className="rounded-xl border border-border bg-white shadow-xs overflow-hidden"
-                >
-                  <div className="border-b border-[#003399]/15 bg-gradient-to-r from-[#003399]/8 via-[#003399]/5 to-transparent px-4 py-2.5 flex items-center justify-between">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-[#003399] flex items-center gap-1.5">
-                      <ClipboardList className="h-3.5 w-3.5" />
-                      Section 1 · Compliance Overview — Open Tenders ({openOrders.length})
-                    </div>
-                    {!canManageDocs && (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-700">
-                        <ShieldAlert className="h-3 w-3" />
-                        Edits restricted · PPDA §16(2)
-                      </span>
-                    )}
-                  </div>
-                  {openOrders.length === 0 ? (
-                    <div className="px-4 py-8 text-center text-xs text-muted-foreground">
-                      No tenders currently in the evaluation pipeline.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-white hover:bg-white">
-                            <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#003399]">LPO #</TableHead>
-                            <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#003399]">Customer</TableHead>
-                            <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#003399]">Stage</TableHead>
-                            {complianceFields.map((cf) => (
-                              <TableHead key={cf.key || cf.short} className="text-[10px] font-semibold uppercase tracking-wider text-[#003399] text-center">
-                                {cf.short}
-                              </TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {openOrders.map((o) => (
-                            <TableRow
-                              key={o.id}
-                              className="cursor-default"
-                            >
-                              <TableCell className="font-mono text-xs font-medium">{o.lpoNumber}</TableCell>
-                              <TableCell className="text-xs font-medium max-w-[180px] truncate" title={o.customerName}>{o.customerName}</TableCell>
-                              <TableCell className="w-[150px]">
-                                {(() => {
-                                  const m = STATUS_META[o.status];
-                                  const Ico = m.icon;
-                                  return (
-                                    <Badge variant="outline" className={cn("gap-1 border-0", m.cls)}>
-                                      <Ico className="h-3 w-3" />
-                                      {m.label}
-                                    </Badge>
-                                  );
-                                })()}
-                              </TableCell>
-                              {complianceFields.map((cf) => {
-                                const cur = (o.ppdaCompliance?.[cf.key as keyof PpdaComplianceDetails] as ComplianceStatus | undefined) || "pending";
-                                return (
-                                  <TableCell key={cf.key || cf.short} className="text-center p-2">
-                                    {canManageDocs ? (
-                                      <Select
-                                        value={cur}
-                                        onValueChange={(v) =>
-                                          handleUpdateOrder(o.id, {
-                                            ppdaCompliance: {
-                                              ...(o.ppdaCompliance || {}),
-                                              [cf.key]: v as ComplianceStatus,
-                                            } as PpdaComplianceDetails,
-                                          })
-                                        }
-                                      >
-                                        <SelectTrigger className={cn("h-7 w-[92px] mx-auto text-[10px] border px-2 rounded-full", chipCls(cur))}>
-                                          <span className="inline-flex items-center gap-1 w-full justify-center">
-                                            <span className={cn("h-1.5 w-1.5 rounded-full", chipDot(cur))} />
-                                            <SelectValue />
-                                          </span>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {nextVals.map((v) => (
-                                            <SelectItem key={v} value={v} className="text-xs capitalize">{v.replace("_", " ")}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    ) : (
-                                      <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold", chipCls(cur))}>
-                                        <ShieldAlert className="h-3 w-3" />
-                                        <span className={cn("h-1.5 w-1.5 rounded-full", chipDot(cur))} />
-                                        <span className="capitalize">{cur.replace("_", " ")}</span>
-                                      </span>
-                                    )}
-                                  </TableCell>
-                                );
-                              })}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.05, duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                  className="rounded-xl border border-border bg-white shadow-xs overflow-hidden"
-                >
-                  <div className="border-b border-[#003399]/15 bg-gradient-to-r from-[#003399]/8 via-[#003399]/5 to-transparent px-4 py-2.5 flex items-center justify-between">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-[#003399] flex items-center gap-1.5">
-                      <FolderKanban className="h-3.5 w-3.5" />
-                      Section 2 · 12-Stage PPDA Lifecycle Kanban
-                    </div>
-                    <span className="text-[10px] text-muted-foreground font-mono">{orders.length} bids</span>
-                  </div>
-                  <div className="p-3 overflow-x-auto">
-                    <div className="grid gap-3 grid-flow-col auto-cols-[minmax(220px,1fr)]">
-                      {stageCols.map((col, cIdx) => {
-                        const meta = STATUS_META[col];
-                        const ColIcon = meta.icon;
-                        const bids = orders.filter((o) => o.status === col);
-                        return (
-                          <motion.div
-                            key={col}
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.03 * cIdx, duration: 0.2 }}
-                            className="rounded-xl border border-border bg-gradient-to-b from-slate-50/60 to-white p-2.5 min-h-[120px] flex flex-col gap-2"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-foreground/80">
-                                <ColIcon className={cn("h-3.5 w-3.5", meta.cls.includes("emerald") ? "text-emerald-600" : meta.cls.includes("rose") ? "text-rose-600" : meta.cls.includes("amber") ? "text-amber-600" : meta.cls.includes("sky") ? "text-sky-600" : meta.cls.includes("violet") ? "text-violet-600" : meta.cls.includes("indigo") ? "text-indigo-600" : meta.cls.includes("teal") ? "text-teal-600" : meta.cls.includes("blue") ? "text-blue-600" : meta.cls.includes("orange") ? "text-orange-600" : "text-slate-600")} />
-                                <span className="truncate">{meta.label}</span>
-                              </div>
-                              <span className="rounded-full bg-[#003399]/10 text-[#003399] text-[10px] font-bold px-1.5 min-w-[20px] text-center tabular-nums">
-                                {bids.length}
-                              </span>
-                            </div>
-                            <div className="flex-1 space-y-1.5">
-                              {bids.length === 0 ? (
-                                <div className="h-[60px] rounded-lg border border-dashed border-border/70 bg-slate-50/40 flex items-center justify-center text-[10px] text-muted-foreground">
-                                  Empty
-                                </div>
-                              ) : (
-                                bids.map((b) => (
-                                  <div key={b.id} className="rounded-lg border border-border bg-white p-2 shadow-[0_1px_0_rgba(0,0,0,0.02)] hover:border-[#003399]/30 hover:shadow-[0_2px_10px_-4px_rgba(0,51,153,0.25)] transition-all">
-                                    <div className="flex items-start justify-between gap-1.5 mb-1">
-                                      <div className="font-mono text-[11px] font-semibold text-foreground truncate">{b.lpoNumber}</div>
-                                      <span className="text-[10px] text-muted-foreground font-mono shrink-0">UGX {(Number(b.amount)||0).toLocaleString()}</span>
-                                    </div>
-                                    <div className="text-[10px] text-muted-foreground truncate mb-1.5" title={b.customerName}>{b.customerName}</div>
-                                    <Select
-                                      value={b.status}
-                                      onValueChange={(v) => handleStatusChange(b.id, v as OrderStatus)}
-                                      disabled={["evaluated","contracts_cmte","awarded","contract_signed"].includes(col) && !canManageDocs}
-                                    >
-                                      <SelectTrigger className="h-6 w-full text-[9px] border-dashed border-border/80 bg-slate-50/60 px-2 hover:bg-[#003399]/5">
-                                        <span className="flex items-center gap-1 w-full justify-between truncate">
-                                          <span className="text-muted-foreground truncate">Move to stage →</span>
-                                          <SelectValue className="text-[9px] font-semibold" />
-                                        </span>
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {stageCols.map((sc) => {
-                                          const sm = STATUS_META[sc];
-                                          const Sci = sm.icon;
-                                          const gate = ["evaluated","contracts_cmte","awarded","contract_signed"].includes(sc);
-                                          const dis = gate && !canManageDocs;
-                                          return (
-                                            <SelectItem key={sc} value={sc} disabled={dis}>
-                                              <div className="flex items-center gap-1.5 pr-2">
-                                                <Sci className="h-3 w-3.5" />
-                                                <span className="text-xs flex-1">{sm.label}</span>
-                                                {dis && <ShieldAlert className="h-3 w-3 text-rose-500" />}
-                                              </div>
-                                            </SelectItem>
-                                          );
-                                        })}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </motion.div>
-              </>
-            );
-          })()}
-
-          <PpdaComplianceWorkspace orders={orders} />
-        </div>
-      )}
-
-      {activeTab === "orders" && (
+      {activeTab === "bids" && (
         <>
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-white p-3">
@@ -3536,33 +3303,6 @@ function OrderFormSheet({
   const [notes, setNotes] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [ppdaProcurementMethod, setPpdaProcurementMethod] = useState<ProcurementMethod>("open_domestic");
-  const [ppdaIsLocal, setPpdaIsLocal] = useState<boolean>(true);
-  const [ppdaIsMsme, setPpdaIsMsme] = useState<boolean>(false);
-  const [ppdaDomesticPct, setPpdaDomesticPct] = useState<string>("30");
-  const [ppdaBidSecurity, setPpdaBidSecurity] = useState<boolean>(false);
-  const [ppdaBidSecurityAmt, setPpdaBidSecurityAmt] = useState<string>("");
-  const [ppdaBidSecurityValid, setPpdaBidSecurityValid] = useState<string>("");
-  const [ppdaBidSecurityIssuer, setPpdaBidSecurityIssuer] = useState<string>("");
-
-  const [ppdaUraTcc, setPpdaUraTcc] = useState<ComplianceStatus>("pending");
-  const [ppdaNssf, setPpdaNssf] = useState<ComplianceStatus>("pending");
-  const [ppdaPpdaCert, setPpdaPpdaCert] = useState<ComplianceStatus>("pending");
-  const [ppdaUrsb, setPpdaUrsb] = useState<ComplianceStatus>("pending");
-  const [ppdaAudited, setPpdaAudited] = useState<ComplianceStatus>("pending");
-  const [ppdaBidSecStatus, setPpdaBidSecStatus] = useState<ComplianceStatus>("not_required");
-  const [ppdaPrn, setPpdaPrn] = useState<ComplianceStatus>("pending");
-  const [ppdaDecl, setPpdaDecl] = useState<ComplianceStatus>("pending");
-
-  const [ppdaEvalCmte, setPpdaEvalCmte] = useState<string>("");
-  const [ppdaContractsCmte, setPpdaContractsCmte] = useState<string>("");
-  const [ppdaStandstillEnd, setPpdaStandstillEnd] = useState<string>("");
-  const [ppdaBidOpenedAt, setPpdaBidOpenedAt] = useState<string>("");
-  const [ppdaTechEvalAt, setPpdaTechEvalAt] = useState<string>("");
-  const [ppdaFinEvalAt, setPpdaFinEvalAt] = useState<string>("");
-  const [ppdaAwardedAt, setPpdaAwardedAt] = useState<string>("");
-  const [ppdaContractSignedAt, setPpdaContractSignedAt] = useState<string>("");
-
   useEffect(() => {
     if (open) {
       setSelectedLpoSource("auto");
@@ -3581,30 +3321,6 @@ function OrderFormSheet({
       setDelivery("");
       setHandledBy(employees[0]?.name || "");
       setNotes("");
-      setPpdaProcurementMethod("open_domestic");
-      setPpdaIsLocal(true);
-      setPpdaIsMsme(false);
-      setPpdaDomesticPct("30");
-      setPpdaBidSecurity(false);
-      setPpdaBidSecurityAmt("");
-      setPpdaBidSecurityValid("");
-      setPpdaBidSecurityIssuer("");
-      setPpdaUraTcc("pending");
-      setPpdaNssf("pending");
-      setPpdaPpdaCert("pending");
-      setPpdaUrsb("pending");
-      setPpdaAudited("pending");
-      setPpdaBidSecStatus("not_required");
-      setPpdaPrn("pending");
-      setPpdaDecl("pending");
-      setPpdaEvalCmte("");
-      setPpdaContractsCmte("");
-      setPpdaStandstillEnd("");
-      setPpdaBidOpenedAt("");
-      setPpdaTechEvalAt("");
-      setPpdaFinEvalAt("");
-      setPpdaAwardedAt("");
-      setPpdaContractSignedAt("");
     }
   }, [open, nextLpo, employees]);
 
@@ -3788,38 +3504,6 @@ function OrderFormSheet({
       total: (Number(i.quantity) || 1) * (Number(i.unitPrice) || 0),
     }));
 
-    const domesticPctNum = parseFloat(ppdaDomesticPct) || 0;
-    const isWorks = ppdaProcurementMethod === "restricted_bidding" || grandTotal >= 10_000_000;
-    const schedule3Eligible = ppdaIsLocal && domesticPctNum >= 30;
-    const prefMargin = schedule3Eligible ? (isWorks ? 7 : 15) : 0;
-    const mergedCompliance: PpdaComplianceDetails = {
-      procurementMethod: ppdaProcurementMethod,
-      bidSecurityRequired: ppdaBidSecurity,
-      bidSecurityAmount: ppdaBidSecurity ? parseFloat(ppdaBidSecurityAmt) || undefined : undefined,
-      bidSecurityValidityDays: ppdaBidSecurity ? parseFloat(ppdaBidSecurityValid) || undefined : undefined,
-      bidSecurityIssuer: ppdaBidSecurity ? ppdaBidSecurityIssuer.trim() || undefined : undefined,
-      isUgandanLocalContent: ppdaIsLocal,
-      isMsmeReservationScheme: ppdaIsMsme,
-      domesticContentPct: domesticPctNum || undefined,
-      preferenceMarginPct: prefMargin || undefined,
-      uraTccStatus: ppdaUraTcc,
-      nssfClearanceStatus: ppdaNssf,
-      ppdaCertStatus: ppdaPpdaCert,
-      ursbStatus: ppdaUrsb,
-      auditedAccountsStatus: ppdaAudited,
-      bidSecurityStatus: ppdaBidSecStatus,
-      prnProofStatus: ppdaPrn,
-      declarationsStatus: ppdaDecl,
-      evaluationCommittee: ppdaEvalCmte ? ppdaEvalCmte.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
-      contractsCommittee: ppdaContractsCmte ? ppdaContractsCmte.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
-      standstillEndDate: ppdaStandstillEnd || undefined,
-      bidOpenedAt: ppdaBidOpenedAt || undefined,
-      techEvaluatedAt: ppdaTechEvalAt || undefined,
-      finEvaluatedAt: ppdaFinEvalAt || undefined,
-      awardedAt: ppdaAwardedAt || undefined,
-      contractSignedAt: ppdaContractSignedAt || undefined,
-    };
-
     onCreate({
       id: crypto.randomUUID(),
       lpoNumber: lpoNumber.trim(),
@@ -3833,7 +3517,6 @@ function OrderFormSheet({
       amount: grandTotal,
       items: cleanItems,
       notes: notes.trim() || undefined,
-      ppdaCompliance: mergedCompliance,
       createdAt: new Date().toISOString(),
     });
   }
@@ -4487,226 +4170,6 @@ function OrderFormSheet({
               </span>
             </div>
           </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.04, duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="rounded-xl border-[#003399]/25 border-dashed ring-1 ring-border/50 bg-gradient-to-br from-[#003399]/[0.03] via-white p-4 space-y-3 shadow-xs"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#003399] flex items-center gap-1.5">
-                <Layers className="h-4 w-4" />
-                PPDA · Classification &amp; Preference (Schedule 3 / 4)
-              </span>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Procurement Method</Label>
-                <Select value={ppdaProcurementMethod} onValueChange={(v) => setPpdaProcurementMethod(v as ProcurementMethod)}>
-                  <SelectTrigger className="w-full bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="open_domestic">Open Domestic Bidding (≥UGX 500M · Sched 4)</SelectItem>
-                    <SelectItem value="restricted_bidding">Restricted / Pre-qualified Shortlisted</SelectItem>
-                    <SelectItem value="request_for_quotation">Request for Quotation (≥3 quotes)</SelectItem>
-                    <SelectItem value="micro_procurement">Micro-Procurement (&lt;5M / &lt;10M · Sched 4)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-[#003399]/15 bg-white p-2.5 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <label htmlFor="ppda-local" className="cursor-pointer text-[11px] font-semibold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
-                      <CheckSquare className="h-3.5 w-3.5" />
-                      Ugandan Local Content
-                    </label>
-                    <Checkbox
-                      id="ppda-local"
-                      checked={ppdaIsLocal}
-                      onCheckedChange={(c) => setPpdaIsLocal(Boolean(c))}
-                      className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <label htmlFor="ppda-msme" className="cursor-pointer text-[11px] font-semibold uppercase tracking-wider text-violet-700 flex items-center gap-1.5">
-                      <Users2 className="h-3.5 w-3.5" />
-                      MSME Reservation (W/Youth/PWD)
-                    </label>
-                    <Checkbox
-                      id="ppda-msme"
-                      checked={ppdaIsMsme}
-                      onCheckedChange={(c) => setPpdaIsMsme(Boolean(c))}
-                      className="data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-500"
-                    />
-                  </div>
-                </div>
-                <div className="rounded-lg border border-[#003399]/15 bg-white p-2.5 space-y-2">
-                  <div>
-                    <Label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                      Domestic value-add %
-                      <span title="Must exceed 30% for Schedule 3 15% / 7% preference eligibility (PPDA Sec 50).">
-                        <Info className="h-3 w-3 text-[#003399]" />
-                      </span>
-                    </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={ppdaDomesticPct}
-                      onChange={(e) => setPpdaDomesticPct(e.target.value)}
-                      className="h-8 bg-white text-xs font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    Bid Security (Guarantee / Bond)
-                  </Label>
-                  <Switch
-                    checked={ppdaBidSecurity}
-                    onCheckedChange={(c) => setPpdaBidSecurity(Boolean(c))}
-                  />
-                </div>
-                {ppdaBidSecurity && (
-                  <div className="grid grid-cols-3 gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                    <div>
-                      <Label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Amount (UGX)</Label>
-                      <Input type="number" value={ppdaBidSecurityAmt} onChange={(e) => setPpdaBidSecurityAmt(e.target.value)} className="h-8 bg-white text-xs font-mono" />
-                    </div>
-                    <div>
-                      <Label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Validity (days)</Label>
-                      <Input type="number" value={ppdaBidSecurityValid} onChange={(e) => setPpdaBidSecurityValid(e.target.value)} className="h-8 bg-white text-xs font-mono" />
-                    </div>
-                    <div>
-                      <Label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Issuer / Bank</Label>
-                      <Input value={ppdaBidSecurityIssuer} onChange={(e) => setPpdaBidSecurityIssuer(e.target.value)} className="h-8 bg-white text-xs" placeholder="e.g. Stanbic" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08, duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="rounded-xl border-[#003399]/25 border-dashed ring-1 ring-border/50 bg-gradient-to-br from-[#003399]/[0.03] via-white p-4 space-y-3 shadow-xs"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#003399] flex items-center gap-1.5">
-                <FileCheck className="h-4 w-4" />
-                PPDA · 8-Point Statutory Compliance Status
-              </span>
-            </div>
-            {[
-              { label: "URA TCC", val: ppdaUraTcc, set: setPpdaUraTcc },
-              { label: "NSSF Clearance", val: ppdaNssf, set: setPpdaNssf },
-              { label: "PPDA ROP", val: ppdaPpdaCert, set: setPpdaPpdaCert },
-              { label: "URSB Incorporation", val: ppdaUrsb, set: setPpdaUrsb },
-              { label: "Audited Accounts", val: ppdaAudited, set: setPpdaAudited },
-              { label: "Bid Security", val: ppdaBidSecStatus, set: setPpdaBidSecStatus },
-              { label: "PRN Fee Proof", val: ppdaPrn, set: setPpdaPrn },
-              { label: "Anti-Corruption Decl", val: ppdaDecl, set: setPpdaDecl },
-            ].reduce<React.ReactNode[][]>((rows, item, i) => {
-              const ri = Math.floor(i / 2);
-              (rows[ri] = rows[ri] || []).push(
-                <div key={item.label} className="space-y-1">
-                  <Label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{item.label}</Label>
-                  <Select value={item.val} onValueChange={(v) => item.set(v as ComplianceStatus)}>
-                    <SelectTrigger className={cn("h-9 bg-white text-xs font-medium capitalize",
-                      item.val === "valid" ? "text-emerald-700" :
-                      item.val === "pending" ? "text-amber-700" :
-                      item.val === "expired" ? "text-rose-700" : "text-slate-600"
-                    )}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(["valid","pending","expired","not_required"] as ComplianceStatus[]).map((cs) => (
-                        <SelectItem key={cs} value={cs} className="text-xs capitalize">{cs.replace("_", " ")}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              );
-              return rows;
-            }, []).map((row, rIdx) => (
-              <div key={rIdx} className="grid grid-cols-2 gap-3">
-                {row}
-              </div>
-            ))}
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12, duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="rounded-xl border-[#003399]/25 border-dashed ring-1 ring-border/50 bg-gradient-to-br from-[#003399]/[0.03] via-white p-4 space-y-3 shadow-xs"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#003399] flex items-center gap-1.5">
-                <Trophy className="h-4 w-4" />
-                PPDA · Evaluation &amp; Award Attribution
-              </span>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <Label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Evaluation Committee
-                </Label>
-                <Textarea
-                  value={ppdaEvalCmte}
-                  onChange={(e) => setPpdaEvalCmte(e.target.value)}
-                  rows={1.5 as any}
-                  placeholder="Employee names, comma-separated (e.g. Jane Doe, John Smith)"
-                  className="text-xs bg-white min-h-[36px] py-1.5"
-                />
-              </div>
-              <div>
-                <Label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                  Contracts Committee (PPDA §16(2))
-                  <span title="5 members minimum: Chair + 3 members + Secretary (lawyer 1 for central-govt PDE). Quorum: 3/5.">
-                    <Info className="h-3 w-3 text-[#003399]" />
-                  </span>
-                </Label>
-                <Textarea
-                  value={ppdaContractsCmte}
-                  onChange={(e) => setPpdaContractsCmte(e.target.value)}
-                  rows={1.5 as any}
-                  placeholder="5 members: Chair + 3 + Secretary/Lawyer, comma-separated"
-                  className="text-xs bg-white min-h-[36px] py-1.5"
-                />
-              </div>
-              <div>
-                <Label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                  Administrative Review Standstill End Date (Sec 91A)
-                  <span title="10 WORKING DAYS post-BEB notice publication (excludes Sat/Sun + 15 Ugandan public holidays). No award actions permitted until expiry.">
-                    <Info className="h-3 w-3 text-[#003399]" />
-                  </span>
-                </Label>
-                <Input type="date" value={ppdaStandstillEnd} onChange={(e) => setPpdaStandstillEnd(e.target.value)} className="h-9 bg-white text-xs font-mono" />
-              </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-                {[
-                  { label: "Bid Opened", val: ppdaBidOpenedAt, set: setPpdaBidOpenedAt },
-                  { label: "Tech Eval", val: ppdaTechEvalAt, set: setPpdaTechEvalAt },
-                  { label: "Fin Eval", val: ppdaFinEvalAt, set: setPpdaFinEvalAt },
-                  { label: "Awarded (BEB)", val: ppdaAwardedAt, set: setPpdaAwardedAt },
-                  { label: "Contract Signed", val: ppdaContractSignedAt, set: setPpdaContractSignedAt },
-                ].map((d) => (
-                  <div key={d.label}>
-                    <Label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{d.label}</Label>
-                    <Input type="date" value={d.val} onChange={(e) => d.set(e.target.value)} className="h-8 bg-white text-[11px] font-mono" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Delivery date" icon={Truck}>
@@ -5525,216 +4988,5 @@ function OrderPreviewDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-const UGANDA_2026_PUBLIC_HOLIDAYS: string[] = [
-  "2026-01-01", "2026-01-26", "2026-03-08", "2026-04-03", "2026-04-06",
-  "2026-05-01", "2026-05-25", "2026-06-03", "2026-06-09", "2026-09-09",
-  "2026-10-09", "2026-10-19", "2026-12-25", "2026-12-26", "2026-12-31",
-];
-
-function workingDaysBetween(startISO: string, endISO: string): number {
-  const s = new Date(startISO + "T00:00:00");
-  const e = new Date(endISO + "T00:00:00");
-  if (e < s) return 0;
-  let count = 0;
-  const cur = new Date(s);
-  while (cur <= e) {
-    const dow = cur.getUTCDay();
-    if (dow !== 0 && dow !== 6) {
-      const iso = cur.toISOString().slice(0, 10);
-      if (!UGANDA_2026_PUBLIC_HOLIDAYS.includes(iso)) count += 1;
-    }
-    cur.setUTCDate(cur.getUTCDate() + 1);
-  }
-  return count;
-}
-
-function PpdaComplianceWorkspace({ orders }: { orders: SalesOrder[] }) {
-  const openDomesticCount = orders.filter((o) => o.ppdaCompliance?.procurementMethod === "open_domestic" || !o.ppdaCompliance?.procurementMethod).length;
-  const restrictedCount = orders.filter((o) => o.ppdaCompliance?.procurementMethod === "restricted_bidding").length;
-  const rfqCount = orders.filter((o) => o.ppdaCompliance?.procurementMethod === "request_for_quotation").length;
-  const microCount = orders.filter((o) => o.ppdaCompliance?.procurementMethod === "micro_procurement").length;
-  const bidSecurityCount = orders.filter((o) => o.ppdaCompliance?.bidSecurityRequired).length;
-  const localContentCount = orders.filter((o) => o.ppdaCompliance?.isUgandanLocalContent ?? true).length;
-  const msmeCount = orders.filter((o) => o.ppdaCompliance?.isMsmeReservationScheme).length;
-
-  const activeStandstills = orders
-    .filter((o) => o.ppdaCompliance?.standstillEndDate && new Date(o.ppdaCompliance.standstillEndDate) >= new Date(todayISO() + "T00:00:00"))
-    .sort((a, b) => (a.ppdaCompliance!.standstillEndDate! < b.ppdaCompliance!.standstillEndDate! ? -1 : 1));
-  const earliestStandstill = activeStandstills[0];
-  const todayIso = todayISO();
-  const standstillWorkingDaysLeft = earliestStandstill?.ppdaCompliance?.standstillEndDate
-    ? workingDaysBetween(todayIso, earliestStandstill.ppdaCompliance.standstillEndDate)
-    : 0;
-
-  const stagger: any = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.04, delayChildren: 0.03 } },
-  };
-  const fadeUp: any = {
-    hidden: { opacity: 0, y: 6 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
-  };
-
-  return (
-    <motion.div
-      variants={stagger}
-      initial="hidden"
-      animate="show"
-      className="space-y-6"
-    >
-      <motion.div
-        variants={fadeUp}
-        className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-gradient-to-br from-[#003399]/10 via-slate-900/5 to-white p-5 shadow-sm"
-      >
-        <div className="absolute -right-14 -top-14 h-56 w-56 rounded-full bg-[#004CCC]/10 blur-3xl" />
-        <div className="absolute -left-10 -bottom-10 h-44 w-44 rounded-full bg-[#003399]/10 blur-3xl" />
-        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#003399] text-white shadow-md ring-1 ring-white/20">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
-            <div>
-              <h3 className="text-base font-bold text-foreground flex flex-wrap items-center gap-2">
-                Uganda Public Procurement & Disposal of Public Assets (PPDA) Compliance
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
-                  PPDA Act Cap 205 · 2023 Regs
-                </Badge>
-                <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200 text-[10px]">
-                  e-GP Phase 2 · Mandatory 1 Jul 2026
-                </Badge>
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5 max-w-3xl leading-relaxed">
-                Automated compliance monitoring for Ugandan bidding processes: procurement method thresholds (Schedule 4, 2023 Amend), mandatory 10-working-day Administrative Review standstill (Sec 91A), Section 50 Local Content preference, and statutory provider clearances.
-                <em className="not-italic italic ml-1 text-[#003399]/80">— PPDA Circular 6/2025 · Amended SBD 2025 enforced.</em>
-              </p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      <motion.div variants={fadeUp} className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-border bg-white p-4 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <FileCheck className="h-4 w-4 text-emerald-600" />
-              Statutory Clearances
-            </span>
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-700">4-Point Checklist</Badge>
-          </div>
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
-              <span>URA Tax Clearance Certificate (TCC)</span>
-              <Badge className="bg-emerald-500 text-white text-[10px]">Valid</Badge>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
-              <span>NSSF Statutory Clearance</span>
-              <Badge className="bg-emerald-500 text-white text-[10px]">Valid</Badge>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
-              <span>PPDA Register of Providers (ROP)</span>
-              <Badge className="bg-emerald-500 text-white text-[10px]">Active Provider</Badge>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
-              <span>URSB Certificate of Incorporation</span>
-              <Badge className="bg-emerald-500 text-white text-[10px]">Valid</Badge>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border bg-white p-4 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Building2 className="h-4 w-4 text-blue-600" />
-              Local Content Preference (Sec 50)
-            </span>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700">{localContentCount} Eligible</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            PPDA Schedule 3 preference margins applied during evaluated-price comparison. Foreign-bid adjustment: domestic goods ≥30% value-add (+15%), works & services (+7%).
-          </p>
-          <div className="p-2 rounded-lg bg-blue-50/60 text-xs font-medium text-blue-800 border border-blue-200/60 flex items-center gap-2">
-            <Check className="h-4 w-4 text-blue-600" />
-            +15% Goods · +7% Works/Services (Schedule 3)
-          </div>
-          {msmeCount > 0 && (
-            <div className="p-2 rounded-lg bg-violet-50 text-[11px] font-medium text-violet-700 border border-violet-200 flex items-center gap-2">
-              <Users2 className="h-3.5 w-3.5" />
-              MSME Reservation · Women / Youth / PWD — {msmeCount} bids
-            </div>
-          )}
-          <p className="text-[11px] text-muted-foreground leading-relaxed border-t border-border/60 pt-2">
-            e-GP Phase 2 requires preference claims to be substantiated via <strong>PPDA ROP domestic-flagged</strong> profile + URSB registration evidence uploaded to the e-GP Uganda portal.
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-border bg-white p-4 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Clock className="h-4 w-4 text-amber-600" />
-              Administrative Review Standstill
-            </span>
-            <Badge variant="outline" className="bg-amber-50 text-amber-700">10 Working Days · Sec 91A</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Mandatory standstill window post Best Evaluated Bidder (BEB) notice publication. Contract signature or LPO execution is prohibited before expiry — <em>working days only, excluding Sat/Sun and the 15 Ugandan public holidays.</em>
-          </p>
-          {earliestStandstill ? (
-            <div className="p-2 rounded-lg bg-amber-50/60 text-xs font-medium text-amber-800 border border-amber-200/60 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4 text-amber-600" />
-                  Active on <span className="font-mono">{earliestStandstill.lpoNumber}</span>
-                </span>
-                <Badge className="bg-amber-500 text-white text-[10px]">{standstillWorkingDaysLeft} WD left</Badge>
-              </div>
-              <div className="text-[11px] text-amber-700/90 font-normal">
-                Ends: <span className="font-mono">{earliestStandstill.ppdaCompliance?.standstillEndDate}</span> · no award actions permitted.
-              </div>
-            </div>
-          ) : (
-            <div className="p-2 rounded-lg bg-slate-50/60 text-xs font-medium text-slate-700 border border-slate-200/60 flex items-center gap-2">
-              <Check className="h-4 w-4 text-slate-500" />
-              No standstill windows active
-            </div>
-          )}
-          <div className="text-[11px] text-muted-foreground flex items-center justify-between pt-1">
-            <span className="flex items-center gap-1">Bid securities lodged</span>
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 text-[10px]">{bidSecurityCount} guarantees</Badge>
-          </div>
-        </div>
-      </motion.div>
-
-      <motion.div variants={fadeUp} className="rounded-xl border border-border bg-white p-4 space-y-3 shadow-xs">
-        <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Layers className="h-4 w-4 text-primary" />
-          Tenders &amp; Procurement Methods Breakdown (PPDA Schedule 4, 2023 Amend Thresholds)
-        </h4>
-        <div className="grid gap-3 sm:grid-cols-4 text-xs">
-          <div className="p-3 rounded-xl border border-border bg-slate-50/50 hover:border-[#003399]/25 hover:bg-[#003399]/[0.02] transition-colors">
-            <span className="text-muted-foreground block text-[11px] font-semibold">Open Domestic Bidding</span>
-            <span className="text-lg font-bold text-foreground font-mono">{openDomesticCount}</span>
-            <span className="text-[10px] text-muted-foreground block">≥ UGX 500M · Sched 4 2023</span>
-          </div>
-          <div className="p-3 rounded-xl border border-border bg-slate-50/50 hover:border-[#003399]/25 hover:bg-[#003399]/[0.02] transition-colors">
-            <span className="text-muted-foreground block text-[11px] font-semibold">Restricted / Pre-qualified</span>
-            <span className="text-lg font-bold text-foreground font-mono">{restrictedCount}</span>
-            <span className="text-[10px] text-muted-foreground block">Shortlisted providers</span>
-          </div>
-          <div className="p-3 rounded-xl border border-border bg-slate-50/50 hover:border-[#003399]/25 hover:bg-[#003399]/[0.02] transition-colors">
-            <span className="text-muted-foreground block text-[11px] font-semibold">RFQ · ≥3 Quotations</span>
-            <span className="text-lg font-bold text-foreground font-mono">{rfqCount}</span>
-            <span className="text-[10px] text-muted-foreground block">Below threshold</span>
-          </div>
-          <div className="p-3 rounded-xl border border-border bg-slate-50/50 hover:border-[#003399]/25 hover:bg-[#003399]/[0.02] transition-colors">
-            <span className="text-muted-foreground block text-[11px] font-semibold">Micro-Procurement</span>
-            <span className="text-lg font-bold text-foreground font-mono">{microCount}</span>
-            <span className="text-[10px] text-muted-foreground block">&lt;5M supplies · &lt;10M works (Sched 4)</span>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
   );
 }

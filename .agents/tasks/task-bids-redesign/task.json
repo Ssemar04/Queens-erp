@@ -1,0 +1,7 @@
+{
+  "task_id": "task-bids-redesign",
+  "task_description": "Bids page (app.orders.tsx) redesign: rename LPO & Awarded tab to Orders, remove PPDA Compliance tab, reorder tabs to Documents→Bids→Orders, add bid-selection gate before creating an Order, and clean up PPDA fields from the Create Bid form.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

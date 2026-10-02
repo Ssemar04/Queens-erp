@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Check, Receipt, User, CreditCard, Package, Boxes, Search, Sparkles, X, Plus, Minus, Trash2, ShoppingCart, FileText, Ruler, Printer, CreditCard as CardIcon, Layers } from "lucide-react";
+import { Check, Receipt, User, CreditCard, Package, Boxes, Search, Sparkles, X, Plus, Minus, Trash2, ShoppingCart, FileText, Ruler, Printer, CreditCard as CardIcon, Layers, AlertTriangle } from "lucide-react";
 import { MovementType, type SaleItem, type AssetSaleCategorySpec, formatAssetSaleSpec } from "@/types/inventory";
 import { getAssetCategoryKind, getAssetCategoryTint } from "@/components/assets/assets-store";
 import type {
@@ -465,6 +465,17 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
             break;
           }
         }
+      }
+    }
+
+    if (balance > 0) {
+      const custName = customer.trim();
+      if (!custName || custName.toLowerCase() === WALK_IN.toLowerCase()) {
+        e.customer = "Customer name is required for sales with a balance (> 0)";
+      }
+      const phone = telephone.trim();
+      if (!phone) {
+        e.telephone = "Telephone number is required for sales with a balance (> 0)";
       }
     }
 
@@ -1244,8 +1255,15 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
 
           {/* People */}
           <section className="space-y-3">
-            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <User className="h-3.5 w-3.5" /> Customer & staff
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <User className="h-3.5 w-3.5" /> Customer & staff
+              </div>
+              {balance > 0 && (
+                <span className="flex items-center gap-1 rounded-full border border-amber-300/60 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                  <AlertTriangle className="h-3 w-3 text-amber-600" /> Details required (Balance &gt; 0)
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1268,7 +1286,9 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                 {errors.staff && <p className="mt-1 text-xs text-destructive">{errors.staff}</p>}
               </div>
               <div>
-                <Label className="mb-1.5 block text-sm">Customer</Label>
+                <Label className="mb-1.5 block text-sm">
+                  Customer {balance > 0 ? <span className="text-destructive font-bold">*</span> : null}
+                </Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -1276,8 +1296,8 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                     onChange={(e) => updateCustomerName(e.target.value)}
                     onFocus={() => setCustomerFocused(true)}
                     onBlur={() => window.setTimeout(() => setCustomerFocused(false), 140)}
-                    placeholder={`${WALK_IN} or search by name / telephone`}
-                    className="pl-8 pr-8"
+                    placeholder={balance > 0 ? "Customer name required *" : `${WALK_IN} or search by name / telephone`}
+                    className={`pl-8 pr-8 ${errors.customer ? "border-destructive focus-visible:ring-destructive bg-destructive/5" : ""}`}
                   />
                   {selectedCustomer && (
                     <button
@@ -1290,6 +1310,7 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                     </button>
                   )}
                 </div>
+                {errors.customer && <p className="mt-1 text-xs font-medium text-destructive">{errors.customer}</p>}
                 {selectedCustomer ? (
                   <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50/70 p-2 text-xs">
                     <div className="flex items-center justify-between gap-2">
@@ -1343,14 +1364,25 @@ export function AddSaleSheet({ open, onOpenChange, items, movements, onCreateMov
                     )}
                   </div>
                 ) : (
-                  <p className="mt-1 text-[10px] text-muted-foreground">Leave blank for walk-in, or type to search existing customers.</p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    {balance > 0 ? "Enter customer name or select from database." : "Leave blank for walk-in, or type to search existing customers."}
+                  </p>
                 )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="mb-1.5 block text-sm">Telephone</Label>
-                <Input type="tel" value={telephone} onChange={(e) => setTelephone(e.target.value)} placeholder="+254 700 000 000" />
+                <Label className="mb-1.5 block text-sm">
+                  Telephone {balance > 0 ? <span className="text-destructive font-bold">*</span> : null}
+                </Label>
+                <Input
+                  type="tel"
+                  value={telephone}
+                  onChange={(e) => setTelephone(e.target.value)}
+                  placeholder={balance > 0 ? "+256 ... (required) *" : "+254 700 000 000"}
+                  className={errors.telephone ? "border-destructive focus-visible:ring-destructive bg-destructive/5" : ""}
+                />
+                {errors.telephone && <p className="mt-1 text-xs font-medium text-destructive">{errors.telephone}</p>}
               </div>
               <div>
                 <Label className="mb-1.5 block text-sm">Email</Label>

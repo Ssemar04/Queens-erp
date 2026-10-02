@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Orders tab bid-selection gate: before creating a new Order (LPO Account), the user must first select an existing Bid from a dropdown. Depends on FEAT-001 completing the tab rename (activeTab 'orders' = old LPO workspace). Changes: (1) add selectedSourceBid state to OrdersPage, (2) extend LpoWorkspaceProps with 'bids' prop and change onCreateLpoAccount signature to accept a SalesOrder, (3) add selectedBidForOrder state + Select dropdown inside LpoWorkspace, (4) pass lpoOrders (not all orders) to LpoWorkspace, (5) add optional sourceBid prop to CreateLpoAccountSheet with pre-population logic.",
+  "status": "pending",
+  "steps": [
+    "Step 1 — OrdersPage state: add 'const [selectedSourceBid, setSelectedSourceBid] = useState<SalesOrder | null>(null);' near the other useState declarations (~line 308).",
+    "Step 2 — LpoWorkspaceProps interface (~line 1300): add 'bids: SalesOrder[];' field and change 'onCreateLpoAccount: () => void' to 'onCreateLpoAccount: (sourceBid: SalesOrder) => void'.",
+    "Step 3 — LpoWorkspace function signature (~line 1308): destructure the new 'bids' prop from props.",
+    "Step 4 — LpoWorkspace internal state: add 'const [selectedBidForOrder, setSelectedBidForOrder] = useState<SalesOrder | null>(null);' inside the LpoWorkspace function body.",
+    "Step 5 — LpoWorkspace Create button area (~line 1459): replace the single 'Create LPO Account' Button with: (a) a Select component populated with bids.filter(b => b.status !== 'declined') showing lpoNumber + customerName, wired to selectedBidForOrder state; (b) a 'Create Order' Button that calls onCreateLpoAccount(selectedBidForOrder!) and is disabled when !selectedBidForOrder, with a tooltip 'Select a bid first' when disabled.",
+    "Step 6 — OrdersPage render of LpoWorkspace (~line 716, now activeTab === 'orders'): pass 'orders={lpoOrders}' (using the lpoOrders memo from FEAT-001 step 4) and 'bids={orders.filter((o) => !o.isLpoAccount)}', and update onCreateLpoAccount callback to '(sourceBid) => { setSelectedSourceBid(sourceBid); setLpoAccountFormOpen(true); }'.",
+    "Step 7 — CreateLpoAccountSheet function signature (~line 2159): add optional 'sourceBid?: SalesOrder | null' prop.",
+    "Step 8 — CreateLpoAccountSheet useEffect reset (~line 2200): after the standard resets, add a conditional block: if (sourceBid) { setSelectedCustomerId(sourceBid.customerId || ''); setCompanyName(sourceBid.customerName); setFeeAmount(String(sourceBid.amount || '')); setHandledBy(sourceBid.handledBy || employees[0]?.name || ''); setEmployeeId(sourceBid.employeeId || employees[0]?.id || ''); if (sourceBid.customerId) { const cust = customers.find(c => c.id === sourceBid.customerId); if (cust) { fill address/tin/location/contact fields from cust } } }.",
+    "Step 9 — CreateLpoAccountSheet JSX form body: add a source-bid callout banner at the top of the form content (inside <div className='mt-6 space-y-4'>): '{sourceBid && ( <div className='rounded-lg border border-[#003399]/20 bg-[#003399]/5 px-3 py-2 text-xs text-[#003399]'> <span className='font-semibold'>Linked bid:</span> {sourceBid.lpoNumber} · {sourceBid.customerName} </div> )}'.",
+    "Step 10 — CreateLpoAccountSheet handleSubmit: in the accountDetails object, add 'sourceBidId: sourceBid?.id ?? undefined, sourceBidNumber: sourceBid?.lpoNumber ?? undefined'.",
+    "Step 11 — OrdersPage JSX where CreateLpoAccountSheet is rendered (~line 1227): pass 'sourceBid={selectedSourceBid}' prop and update onOpenChange to clear sourceBid on close: 'onOpenChange={(open) => { setLpoAccountFormOpen(open); if (!open) setSelectedSourceBid(null); }}'."
+  ],
+  "acceptance_criteria": [
+    "Running 'cd d:\\House\\qterp\\frontend && npx tsc --noEmit' produces zero errors.",
+    "LpoWorkspaceProps interface contains 'bids: SalesOrder[]' and 'onCreateLpoAccount: (sourceBid: SalesOrder) => void'.",
+    "selectedBidForOrder state exists inside LpoWorkspace.",
+    "CreateLpoAccountSheet accepts an optional sourceBid prop.",
+    "The Create Order button inside LpoWorkspace is disabled when no bid is selected.",
+    "When a bid is selected, CreateLpoAccountSheet opens with companyName pre-populated from the selected bid's customerName."
+  ],
+  "verification": [
+    "cd d:\\House\\qterp\\frontend && npx tsc --noEmit",
+    "In the modified file, search for 'selectedBidForOrder' — should appear at least twice (useState declaration and usage in Select onValueChange).",
+    "In the modified file, search for 'sourceBid' — should appear in CreateLpoAccountSheet props and useEffect."
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

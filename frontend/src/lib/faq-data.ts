@@ -58,7 +58,7 @@ export const FAQ_DATA: FaqCategory[] = [
     title: "Assets & maintenance",
     items: [
       { question: "How do I record a daily meter reading?", answer: "Open the asset's detail sheet and use the meter reading logger. Service-due 'pressure' updates against both the next-service meter and date." },
-      { question: "How is book value calculated?", answer: "Straight-line depreciation between purchase cost and salvage value over the asset's useful life. The detail sheet also shows TCO (cost of ownership)." },
+      { question: "How is asset value calculated?", answer: "Asset value represents total purchase cost without depreciation. The detail sheet also shows income generated and service history." },
     ],
   },
   {
